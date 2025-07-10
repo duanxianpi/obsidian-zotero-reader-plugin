@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# Move into the reader directory, install dependencies, and build
+cd reader
+npx webpack-dev-server --mode development --config webpack.obsidian.js --config-name dev
+

@@ -1,4 +1,4 @@
-[submodule "reader/obsidian-zotero-reader"]
-	path = reader/obsidian-zotero-reader
+[submodule "reader/reader"]
+	path = reader/reader
 	url = git@github.com:duanxianpi/obsidian-zotero-reader.git
 	branch = master

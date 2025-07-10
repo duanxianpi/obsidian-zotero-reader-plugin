@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Move into the reader directory, install dependencies, and build
+cd reader
+npm ci
+webpack --config webpack.obsidian.js
+
