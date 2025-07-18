@@ -11,18 +11,22 @@
     "importHelpers": true,
     "isolatedModules": true,
     "strictNullChecks": true,
+    "jsx": "react",
     "lib": [
       "DOM",
       "ES5",
       "ES6",
       "ES7"
-    ]
+    ],
+    "paths": {
+      "zotero-reader": ["reader/index.d.ts"],
+    }
   },
   "include": [
     "**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "reader"
-  ],
+    "reader/reader"
+  ]
 }
