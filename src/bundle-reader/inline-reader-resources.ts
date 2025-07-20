@@ -1,5 +1,5 @@
 import { ungzip } from "pako";
-import { patchPDFViewerHTML } from "./patch-inlined-resources";
+import { patchPDFJSViewerHTML } from "./patch-inlined-resources";
 
 const readerContext = require.context(
 	"../../reader/reader/build/obsidian/",
@@ -60,15 +60,10 @@ export function initializeBlobUrls(): Record<string, string> {
 		});
 		const url = URL.createObjectURL(blob);
 		BLOB_URL_MAP[fileName] = url;
-		console.debug(
-			`Register Blob URL for ${key}: ${url}, type: ${
-				mimeTypes[fileName.slice(fileName.lastIndexOf("."))]
-			}`
-		);
 	});
 
 	// Patch the viewer.html
-	patchPDFViewerHTML(BLOB_BINARY_MAP, BLOB_URL_MAP);
+	BLOB_URL_MAP["pdf/web/viewer.html"] = patchPDFJSViewerHTML(BLOB_BINARY_MAP, BLOB_URL_MAP);
 
 	return BLOB_URL_MAP;
 }

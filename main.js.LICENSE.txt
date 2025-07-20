@@ -1,1 +1,3 @@
-/*! For license information please see reader.js.LICENSE.txt */
+/*! formdata-polyfill. MIT License. Jimmy Wärting <https://jimmy.warting.se/opensource> */
+
+/*! ws. MIT License. Einar Otto Stangvik <einaros@gmail.com> */

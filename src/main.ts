@@ -10,7 +10,7 @@ import {
 } from "obsidian";
 
 import {
-	ObsidianZoteroReaderView,
+	ZoteroReaderView,
 	VIEW_TYPE,
 	SUPPORTED_EXTENSIONS,
 } from "./view";
@@ -40,7 +40,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 
 		// Register the view
 		this.registerView(VIEW_TYPE, (leaf) => {
-			const view = new ObsidianZoteroReaderView(leaf, this.BLOB_URL_MAP);
+			const view = new ZoteroReaderView(leaf, this.BLOB_URL_MAP);
 			return view;
 		});
 

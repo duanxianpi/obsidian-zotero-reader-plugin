@@ -1,7 +1,6 @@
 {
 	"id": "zotero-reader",
 	"name": "Zotero Reader",
-	"version": "0.1.0",
 	"minAppVersion": "0.0.0",
 	"description": "A Zotero reader plugin for Obsidian",
 	"author": "Xianpi Duan",

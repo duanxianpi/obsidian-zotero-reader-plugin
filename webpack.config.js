@@ -3,7 +3,6 @@
 const path = require("path");
 const webpack = require("webpack");
 const builtins = require("builtin-modules");
-const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const zlib = require("zlib");
 
 module.exports = (_env, argv) => {
@@ -27,6 +26,12 @@ if you want to view the source, please visit the github repository of this plugi
 		mode: prod ? "production" : "development",
 		devtool: prod ? false : "inline-source-map",
 		resolve: {
+			alias: {
+				"node:stream": require.resolve("stream-browserify"),
+			},
+			fallback: {
+				stream: require.resolve("stream-browserify"),
+			},
 			extensions: [".ts", ".tsx", ".js"],
 		},
 		module: {
