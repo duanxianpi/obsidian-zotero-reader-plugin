@@ -55,7 +55,7 @@ export function initializeBlobUrls(): Record<string, string> {
 			data: decompressedBase64,
 		};
 
-		const blob = new Blob([decompressedBase64], {
+		const blob = new Blob([decompressedBase64 as BlobPart], {
 			type: type,
 		});
 		const url = URL.createObjectURL(blob);
