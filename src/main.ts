@@ -19,7 +19,6 @@ import {
 import { ZoteroReaderView, VIEW_TYPE as READER_VIEW_TYPE } from "./reader-view";
 import { initializeBlobUrls } from "./bundle-reader/inline-reader-resources";
 import { v4 as uuidv4 } from "uuid";
-import * as path from "path";
 
 interface ZoteroReaderPluginSettings {
 	mySetting: string;
@@ -73,8 +72,8 @@ const RULES: ReaderIconDisplayRule[] = [
 					}
 
 					// Check if the file extension is supported
-					const extname = path.extname(fileParam).slice(1);
-					if (!SUPPORTED_EXTENSIONS.includes(extname)) {
+					const extname = fileParam.split(".").pop();
+					if (!extname || !SUPPORTED_EXTENSIONS.includes(extname)) {
 						return false;
 					}
 
@@ -95,8 +94,10 @@ const RULES: ReaderIconDisplayRule[] = [
 			if (!file || !(file instanceof TFile)) return false;
 
 			// Check if file extension is supported
-			const extname = path.extname(trimmedValue).slice(1);
-			return SUPPORTED_EXTENSIONS.includes(extname);
+			const extname = trimmedValue.split(".").pop();
+			return (
+				extname !== undefined && SUPPORTED_EXTENSIONS.includes(extname)
+			);
 		},
 	},
 ];
@@ -114,10 +115,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 
 		// Register the view
 		this.registerView(READER_VIEW_TYPE, (leaf) => {
-			const view = new ZoteroReaderView(
-				leaf,
-				this.BLOB_URL_MAP
-			);
+			const view = new ZoteroReaderView(leaf, this.BLOB_URL_MAP);
 			return view;
 		});
 
@@ -166,7 +164,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 			| undefined;
 
 		if (!fm || !fm["noteid"]) {
-			// Generate a new UUID
+			// Generate a new id
 			const newNoteId = uuidv4();
 
 			// Update the frontmatter

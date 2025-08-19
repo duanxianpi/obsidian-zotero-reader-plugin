@@ -16,7 +16,7 @@ if you want to view the source, please visit the github repository of this plugi
 	// ---------- 1.  JS / TS bundle (main.js) ----------
 	const jsConfig = {
 		name: "main",
-		target: "node", // keep Node-builtins, CJS output
+		target: "web", // keep Node-builtins, CJS output
 		entry: "./src/main.ts",
 		output: {
 			filename: "main.js",
@@ -26,12 +26,6 @@ if you want to view the source, please visit the github repository of this plugi
 		mode: prod ? "production" : "development",
 		devtool: prod ? false : "inline-source-map",
 		resolve: {
-			alias: {
-				"node:stream": require.resolve("stream-browserify"),
-			},
-			fallback: {
-				stream: require.resolve("stream-browserify"),
-			},
 			extensions: [".ts", ".tsx", ".js"],
 		},
 		module: {
