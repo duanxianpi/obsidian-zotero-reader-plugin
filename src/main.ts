@@ -103,6 +103,7 @@ const RULES: ReaderIconDisplayRule[] = [
 
 export default class ZoteroReaderPlugin extends Plugin {
 	settings: ZoteroReaderPluginSettings;
+	theme: string;
 	BLOB_URL_MAP: Record<string, string>;
 
 	async onload() {
@@ -111,11 +112,12 @@ export default class ZoteroReaderPlugin extends Plugin {
 		// Initialize the inline blob URLs need by the reader
 		this.BLOB_URL_MAP = initializeBlobUrls();
 
-		console.log(this.BLOB_URL_MAP);
-
 		// Register the view
 		this.registerView(READER_VIEW_TYPE, (leaf) => {
-			const view = new ZoteroReaderView(leaf, this.BLOB_URL_MAP);
+			const view = new ZoteroReaderView(
+				leaf,
+				this.BLOB_URL_MAP
+			);
 			return view;
 		});
 
@@ -135,23 +137,6 @@ export default class ZoteroReaderPlugin extends Plugin {
 		);
 
 		this.initHeaderToggleButton();
-
-		// // unregister the PDF file extension to use our custom view
-		// // https://github.com/MeepTech/obsidian-custom-file-extensions-plugin/blob/b6f40d38ceb93437ad9db61a6f81d0b1fb1352f7/src/main.ts#L136C11-L146C12
-		// try {
-		// 	/**@ts-expect-error */
-		// 	this.app.viewRegistry.unregisterExtensions(SUPPORTED_EXTENSIONS);
-		// } catch {
-		// 	const message = `Could not unregister extension: '${SUPPORTED_EXTENSIONS}'`;
-		// 	new Notification("Error: Zotero Reader Plugin", {
-		// 		body: message,
-		// 	});
-
-		// 	console.error(message);
-		// }
-
-		// // Register the extensions for our custom view
-		// this.registerExtensions(SUPPORTED_EXTENSIONS, VIEW_TYPE);
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
@@ -229,14 +214,17 @@ export default class ZoteroReaderPlugin extends Plugin {
 		// Extract relevant information from frontmatter
 		const url = fm?.["url"] as string;
 		const noteId = fm?.["noteid"] as string;
-		
+
 		// Determine the source type and prepare state accordingly
 		let sourceType: "local" | "url" | "obsidian-uri" = "local";
 		let sourceUrl = "";
 
 		if (typeof url === "string") {
 			const trimmedUrl = url.trim();
-			if (trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://")) {
+			if (
+				trimmedUrl.startsWith("http://") ||
+				trimmedUrl.startsWith("https://")
+			) {
 				sourceType = "url";
 				sourceUrl = trimmedUrl;
 			} else if (trimmedUrl.startsWith("obsidian://")) {
@@ -251,7 +239,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 		// Store comprehensive state for the reader view
 		await leaf.setViewState({
 			type: READER_VIEW_TYPE,
-			state: { 
+			state: {
 				mdFile: file,
 				mdFrontmatter: fm,
 				noteId: noteId,
@@ -259,6 +247,13 @@ export default class ZoteroReaderPlugin extends Plugin {
 				sourceUrl: sourceUrl,
 			},
 			active: true,
+		});
+	}
+
+	private removeIconFrom(ele: HTMLElement) {
+		const icons = ele.querySelectorAll(`#${TOGGLE_ICON_CONTAINER_ID}`);
+		icons.forEach((icon) => {
+			icon.remove();
 		});
 	}
 
@@ -294,13 +289,6 @@ export default class ZoteroReaderPlugin extends Plugin {
 		btn.setTooltip("Open as Zotero Reader");
 		btn.onClick(async () => {
 			await this.toggleReaderView(activeView.leaf, file);
-		});
-	}
-
-	private removeIconFrom(ele: HTMLElement) {
-		const icons = ele.querySelectorAll(`#${TOGGLE_ICON_CONTAINER_ID}`);
-		icons.forEach((icon) => {
-			icon.remove();
 		});
 	}
 

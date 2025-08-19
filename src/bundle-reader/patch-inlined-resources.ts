@@ -21,7 +21,9 @@ function getPatchedViewerCSS(
 				k.includes(url.match(/([^\/?#]+)(?:\?.*)?$/)[1])
 			);
 			if (hit) {
-				const base64 = btoa(String.fromCharCode.apply(null, BLOB_BINARY_MAP[hit].data));
+				const base64 = btoa(
+					String.fromCharCode.apply(null, BLOB_BINARY_MAP[hit].data)
+				);
 				const mimeType = BLOB_BINARY_MAP[hit].type || "text/css";
 				return `url("data:${mimeType};base64,${base64}")`;
 			} else {
@@ -42,62 +44,78 @@ function getPatchedViewerCSS(
  * • Worker
  */
 export function patchPDFJSViewerHTML(
-  BLOB_BINARY_MAP: Record<string, { type: string; data: Uint8Array }>,
-  BLOB_URL_MAP: Record<string, string>
+	BLOB_BINARY_MAP: Record<string, { type: string; data: Uint8Array }>,
+	BLOB_URL_MAP: Record<string, string>
 ) {
-  // 1. Get original HTML bytes
-  let originalHTML = BLOB_BINARY_MAP["pdf/web/viewer.html"].data;
-  const BOM = [0xef, 0xbb, 0xbf];
-  if (
-    originalHTML[0] === BOM[0] &&
-    originalHTML[1] === BOM[1] &&
-    originalHTML[2] === BOM[2]
-  ) {
-    originalHTML = originalHTML.slice(3);
-  }
-  const text = new TextDecoder("utf-8").decode(originalHTML);
+	// 1. Get original HTML bytes
+	let originalHTML = BLOB_BINARY_MAP["pdf/web/viewer.html"].data;
+	const BOM = [0xef, 0xbb, 0xbf];
+	if (
+		originalHTML[0] === BOM[0] &&
+		originalHTML[1] === BOM[1] &&
+		originalHTML[2] === BOM[2]
+	) {
+		originalHTML = originalHTML.slice(3);
+	}
+	const text = new TextDecoder("utf-8").decode(originalHTML);
 
-  // 2. Parse into a DOM
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(text, "text/html");
+	// 2. Parse into a DOM
+	const parser = new DOMParser();
+	const doc = parser.parseFromString(text, "text/html");
 
-  // Guard: ensure <head> exists (PDF viewer.html should have it)
-  const head = doc.head || doc.getElementsByTagName("head")[0];
-  
-  const cssLinks = doc.querySelectorAll('link[rel="stylesheet"][href="viewer.css"]');
-  cssLinks.forEach(linkEl => {
-    const styleEl = doc.createElement("style");
-    styleEl.textContent = getPatchedViewerCSS(BLOB_BINARY_MAP);
-    linkEl.replaceWith(styleEl);
-  });
+	// Guard: ensure <head> exists (PDF viewer.html should have it)
+	const head = doc.head || doc.getElementsByTagName("head")[0];
 
-  // 4. Rewrite <script type="module" src="...">
-  const moduleScripts = doc.querySelectorAll('script[type="module"][src]');
-  moduleScripts.forEach(scriptEl => {
-    const src = scriptEl.getAttribute("src") || "";
-    // Find a key whose basename matches (similar to your RegExp logic)
-    const basenameMatch = src.match(/([^\/?#]+)(?:\?.*)?$/);
-    const basename = basenameMatch?.[1];
-    if (basename) {
-      const hit = Object.keys(BLOB_URL_MAP).find(k => k.includes(basename));
-      if (hit) {
-        scriptEl.setAttribute("src", BLOB_URL_MAP[hit]);
-      } else {
-        console.warn(`No blob URL found for ${src}`);
-      }
-    }
-  });
+	const cssLinks = doc.querySelectorAll(
+		'link[rel="stylesheet"][href="viewer.css"]'
+	);
+	cssLinks.forEach((linkEl) => {
+		const styleEl = doc.createElement("style");
+		styleEl.textContent = getPatchedViewerCSS(BLOB_BINARY_MAP);
+		linkEl.replaceWith(styleEl);
+	});
 
-  // 5. Build the patch scripts (order: first the map, then the monkey patch)
-  const blobMapScript = doc.createElement("script");
-  blobMapScript.type = "module";
-  blobMapScript.textContent = `
+	// 4. Rewrite <script type="module" src="...">
+	const moduleScripts = doc.querySelectorAll('script[type="module"][src]');
+	moduleScripts.forEach((scriptEl) => {
+		const src = scriptEl.getAttribute("src") || "";
+		// Find a key whose basename matches (similar to your RegExp logic)
+		const basenameMatch = src.match(/([^\/?#]+)(?:\?.*)?$/);
+		const basename = basenameMatch?.[1];
+		if (basename) {
+			const hit = Object.keys(BLOB_URL_MAP).find((k) =>
+				k.includes(basename)
+			);
+			if (hit) {
+				scriptEl.setAttribute("src", BLOB_URL_MAP[hit]);
+			} else {
+				console.warn(`No blob URL found for ${src}`);
+			}
+		}
+	});
+
+	// 5. Build the patch scripts (order: first the map, then the monkey patch)
+	const blobMapScript = doc.createElement("script");
+	blobMapScript.type = "module";
+	blobMapScript.textContent = `
     globalThis.BLOB_URL_MAP = ${JSON.stringify(BLOB_URL_MAP)};
+
+    globalThis.addObsidianStyleVars = function(obsidianStyles) {
+      const newStylesheet = new CSSStyleSheet();
+      for (const [selector, styles] of Object.entries(obsidianStyles)) {
+        newStylesheet.insertRule(
+          \`\${selector} { \${Object.entries(styles)
+            .map(([key, value]) => \`\${key}: \${value};\`)
+            .join(" ")} }\`
+        );
+      }
+      document.adoptedStyleSheets.push(newStylesheet);
+    };
   `.trim();
 
-  const patchScript = doc.createElement("script");
-  patchScript.type = "module";
-  patchScript.textContent = `
+	const patchScript = doc.createElement("script");
+	patchScript.type = "module";
+	patchScript.textContent = `
     /** Find matching resource key and return its blob URL */
     function getBlobUrlForRequest(requestedUrl) {
       const isRelative = (u) => !/^[a-zA-Z][a-zA-Z\\d+\\-.]*:/.test(u) && !u.startsWith("//");
@@ -181,28 +199,28 @@ export function patchPDFJSViewerHTML(
     // xhr.send();
   `.trim();
 
-  // Insert both at head start (prepend order: second inserted first so final order is map then patch)
-  if (head.firstChild) {
-    head.insertBefore(patchScript, head.firstChild);
-    head.insertBefore(blobMapScript, head.firstChild);
-  } else {
-    head.appendChild(blobMapScript);
-    head.appendChild(patchScript);
-  }
+	// Insert both at head start (prepend order: second inserted first so final order is map then patch)
+	if (head.firstChild) {
+		head.insertBefore(patchScript, head.firstChild);
+		head.insertBefore(blobMapScript, head.firstChild);
+	} else {
+		head.appendChild(blobMapScript);
+		head.appendChild(patchScript);
+	}
 
-  // 7. Serialize DOM back to HTML
-  // Keep existing DOCTYPE if present
-  const doctype = Array.from(doc.childNodes).find(
-    n => n.nodeType === Node.DOCUMENT_TYPE_NODE
-  ) as DocumentType | undefined;
+	// 7. Serialize DOM back to HTML
+	// Keep existing DOCTYPE if present
+	const doctype = Array.from(doc.childNodes).find(
+		(n) => n.nodeType === Node.DOCUMENT_TYPE_NODE
+	) as DocumentType | undefined;
 
-  const serialized =
-    (doctype ? `<!DOCTYPE ${doctype.name}>\n` : "<!DOCTYPE html>\n") +
-    doc.documentElement.outerHTML;
+	const serialized =
+		(doctype ? `<!DOCTYPE ${doctype.name}>\n` : "<!DOCTYPE html>\n") +
+		doc.documentElement.outerHTML;
 
-  // 8. Make blob URL
-  const blob = new Blob([serialized], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
-  console.info(`Patched viewer.html with blob URL: ${url}`);
-  return url;
+	// 8. Make blob URL
+	const blob = new Blob([serialized], { type: "text/html" });
+	const url = URL.createObjectURL(blob);
+	console.info(`Patched viewer.html with blob URL: ${url}`);
+	return url;
 }
