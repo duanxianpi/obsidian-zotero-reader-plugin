@@ -7,7 +7,7 @@ export const VIEW_TYPE = "obsidian-zotero-reader";
 type ReaderOptions = {
 	data: { buf: Uint8Array; url: string };
 	type: string;
-	theme: string;
+	obsidianTheme: string;
 	sidebarOpen: boolean;
 };
 
@@ -126,7 +126,7 @@ export class ZoteroReaderView extends ItemView {
 			data: { buf: new Uint8Array(arrayBuffer), url: "" },
 			type: type,
 			sidebarOpen: false,
-			theme: this.theme,
+			obsidianTheme: this.theme,
 		});
 	}
 
@@ -143,7 +143,7 @@ export class ZoteroReaderView extends ItemView {
 			data: { buf: new Uint8Array(), url: this.state.sourceUrl },
 			type: "pdf", // Default to PDF, you might want to detect this
 			sidebarOpen: false,
-			theme: this.theme,
+			obsidianTheme: this.theme,
 		});
 	}
 
@@ -184,7 +184,7 @@ export class ZoteroReaderView extends ItemView {
 					sidebarOpen: false,
 					data: { buf: new Uint8Array(arrayBuffer), url: "" },
 					type: type,
-					theme: this.theme,
+					obsidianTheme: this.theme,
 				});
 			} else {
 				// File not found in current vault
@@ -220,7 +220,6 @@ export class ZoteroReaderView extends ItemView {
 					// Check if the connection is still active before calling remote method
 					this.readerRemote.toggleTheme(this.theme, theme);
 					this.theme = theme;
-					console.log("Theme changed to:", theme);
 				}
 			});
 

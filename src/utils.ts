@@ -13,7 +13,7 @@ export function extractObsidianStyles() {
 					Array.from(sheet.cssRules).forEach((rule) => {
 						const styleRule = rule as CSSStyleRule;
 						if (
-							styleRule.selectorText === selector &&
+							styleRule.selectorText && styleRule.selectorText.split(",").map((s) => s.trim()).includes(selector) &&
 							styleRule.style
 						) {
 							Array.from(styleRule.style).forEach((name) => {
@@ -34,17 +34,11 @@ export function extractObsidianStyles() {
 	const bodyVariables = extractCSSVariables("body");
 	const themeLightVariables = extractCSSVariables(".theme-light");
 	const themeDarkVariables = extractCSSVariables(".theme-dark");
-	const themeDLVariables = extractCSSVariables(".theme-dark, .theme-light");
-	const themeLDVariables = extractCSSVariables(".theme-light, .theme-dark");
 
 	return {
 		body: bodyVariables,
 		".obsidian-theme-light": themeLightVariables,
 		".obsidian-theme-dark": themeDarkVariables,
-		".obsidian-theme-light, .obsidian-theme-dark": {
-			...themeDLVariables,
-			...themeLDVariables,
-		},
 	};
 }
 
