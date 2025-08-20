@@ -16,7 +16,7 @@ import {
 	WorkspaceLeaf,
 } from "obsidian";
 
-import { ZoteroReaderView, VIEW_TYPE as READER_VIEW_TYPE } from "./reader-view";
+import { ZoteroReaderView, VIEW_TYPE as READER_VIEW_TYPE } from "./view/zotero-reader-view";
 import { initializeBlobUrls } from "./bundle-reader/inline-reader-resources";
 import { v4 as uuidv4 } from "uuid";
 
@@ -44,7 +44,7 @@ const RULES: ReaderIconDisplayRule[] = [
 		validator: (value, _) => value === true || value === "true",
 	},
 	{
-		key: "url",
+		key: "source",
 		optional: false,
 		validator: (value, vault) => {
 			if (typeof value !== "string" || value.trim().length === 0) {
@@ -64,8 +64,8 @@ const RULES: ReaderIconDisplayRule[] = [
 			// Check if it's an Obsidian URI scheme path
 			if (trimmedValue.startsWith("obsidian://")) {
 				try {
-					const url = new URL(trimmedValue);
-					const fileParam = url.searchParams.get("file");
+					const source = new URL(trimmedValue);
+					const fileParam = source.searchParams.get("file");
 
 					if (!fileParam) {
 						return false;
@@ -210,27 +210,21 @@ export default class ZoteroReaderPlugin extends Plugin {
 			| undefined;
 
 		// Extract relevant information from frontmatter
-		const url = fm?.["url"] as string;
+		const source = fm?.["source"] as string;
 		const noteId = fm?.["noteid"] as string;
 
 		// Determine the source type and prepare state accordingly
-		let sourceType: "local" | "url" | "obsidian-uri" = "local";
-		let sourceUrl = "";
+		const trimmedSource = source.trim();
+		let sourceType: "local" | "url" = "local";
 
-		if (typeof url === "string") {
-			const trimmedUrl = url.trim();
+		if (typeof source === "string") {
 			if (
-				trimmedUrl.startsWith("http://") ||
-				trimmedUrl.startsWith("https://")
+				trimmedSource.startsWith("http://") ||
+				trimmedSource.startsWith("https://")
 			) {
-				sourceType = "url";
-				sourceUrl = trimmedUrl;
-			} else if (trimmedUrl.startsWith("obsidian://")) {
-				sourceType = "obsidian-uri";
-				sourceUrl = trimmedUrl;
+				sourceType = "url";;
 			} else {
 				sourceType = "local";
-				sourceUrl = trimmedUrl; // relative path
 			}
 		}
 
@@ -242,7 +236,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 				mdFrontmatter: fm,
 				noteId: noteId,
 				sourceType: sourceType,
-				sourceUrl: sourceUrl,
+				source: trimmedSource,
 			},
 			active: true,
 		});

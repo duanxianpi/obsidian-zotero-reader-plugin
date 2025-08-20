@@ -1,4 +1,4 @@
-export function extractObsidianStyles() {
+export function extractObsidianStylesVars() {
 	const extractCSSVariables = (selector: string): Record<string, string> => {
 		const variables: Record<string, string> = {};
 

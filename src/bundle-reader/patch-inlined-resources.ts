@@ -1,6 +1,7 @@
-/**
+/** -----------------------------------------------------------
  * This function is used to patch the viewer.css file, since css cannot use blob URLs directly.
  * It will replace the original URLs with data URLs instead.
+ * ------------------------------------------------------------
  */
 
 function getPatchedViewerCSS(
@@ -36,18 +37,19 @@ function getPatchedViewerCSS(
 	return adjustedCss;
 }
 
-/** This function is used to patch the PDF viewer HTML file to use the blob URLs
+/** -----------------------------------------------------------
+ * This function is used to patch the PDF viewer HTML file to use the blob URLs
  * for inline resources instead of the original URLs.
  * The following will be replaced in the viewer.html:
- * • fetch
- * • XMLHttpRequest
- * • Worker
+ * - fetch
+ * - XMLHttpRequest
+ * ------------------------------------------------------------
  */
 export function patchPDFJSViewerHTML(
 	BLOB_BINARY_MAP: Record<string, { type: string; data: Uint8Array }>,
 	BLOB_URL_MAP: Record<string, string>
 ) {
-	// 1. Get original HTML bytes
+	// Get original HTML bytes
 	let originalHTML = BLOB_BINARY_MAP["pdf/web/viewer.html"].data;
 	const BOM = [0xef, 0xbb, 0xbf];
 	if (
@@ -59,7 +61,7 @@ export function patchPDFJSViewerHTML(
 	}
 	const text = new TextDecoder("utf-8").decode(originalHTML);
 
-	// 2. Parse into a DOM
+	// Parse into a DOM
 	const parser = new DOMParser();
 	const doc = parser.parseFromString(text, "text/html");
 
@@ -75,7 +77,7 @@ export function patchPDFJSViewerHTML(
 		linkEl.replaceWith(styleEl);
 	});
 
-	// 4. Rewrite <script type="module" src="...">
+	// Rewrite <script type="module" src="...">
 	const moduleScripts = doc.querySelectorAll('script[type="module"][src]');
 	moduleScripts.forEach((scriptEl) => {
 		const src = scriptEl.getAttribute("src") || "";
@@ -94,23 +96,21 @@ export function patchPDFJSViewerHTML(
 		}
 	});
 
-	// 5. Build the patch scripts (order: first the map, then the monkey patch)
+	// Build the patch scripts (order: first the map, then the monkey patch)
 	const blobMapScript = doc.createElement("script");
 	blobMapScript.type = "module";
 	blobMapScript.textContent = `
-    globalThis.BLOB_URL_MAP = ${JSON.stringify(BLOB_URL_MAP)};
+    globalThis.BLOB_URL_MAP = globalThis.parent.BLOB_URL_MAP;
 
-    globalThis.addObsidianStyleVars = function(obsidianStyles) {
-      const newStylesheet = new CSSStyleSheet();
-      for (const [selector, styles] of Object.entries(obsidianStyles)) {
-        newStylesheet.insertRule(
-          \`\${selector} { \${Object.entries(styles)
-            .map(([key, value]) => \`\${key}: \${value};\`)
-            .join(" ")} }\`
-        );
-      }
-      document.adoptedStyleSheets.push(newStylesheet);
-    };
+    const newStylesheet = new CSSStyleSheet();
+    for (const [selector, styles] of Object.entries(globalThis.parent.OBSIDIAN_THEME_VARIABLES)) {
+      newStylesheet.insertRule(
+        \`\${selector} { \${Object.entries(styles)
+          .map(([key, value]) => \`\${key}: \${value};\`)
+          .join(" ")} }\`
+      );
+    }
+    document.adoptedStyleSheets.push(newStylesheet);
   `.trim();
 
 	const patchScript = doc.createElement("script");
