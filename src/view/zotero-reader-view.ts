@@ -1,7 +1,13 @@
-import { WorkspaceLeaf, TFile, ViewStateResult, ItemView, App } from "obsidian";
-import { extractObsidianStylesVars } from "../utils";
+import {
+	WorkspaceLeaf,
+	TFile,
+	ViewStateResult,
+	ItemView,
+	App,
+	getIcon,
+} from "obsidian";
 import { IframeReaderBridge } from "./zotero-reader-bridge";
-import { CreateReaderOptions, Theme } from "./zotero-reader";
+import { ChildEvents, CreateReaderOptions, Theme } from "./zotero-reader";
 
 export const VIEW_TYPE = "zotero-reader-view";
 
@@ -23,11 +29,11 @@ export class ZoteroReaderView extends ItemView {
 
 	constructor(
 		leaf: WorkspaceLeaf,
-		private BLOB_URL_MAP: Record<string, string>
 	) {
 		super(leaf);
 		this.theme =
 			(getComputedStyle(document.body).colorScheme as Theme) ?? "dark";
+		this.icon = "zotero-icon";
 	}
 
 	async setState(
@@ -40,14 +46,14 @@ export class ZoteroReaderView extends ItemView {
 		await super.setState(state, result);
 
 		// Reload view
-		this.reloadView();
+		this.render();
 	}
 
 	getState(): ReaderViewState {
 		return this.state;
 	}
 
-	async reloadView() {
+	async render() {
 		try {
 			if (
 				!this.state ||
@@ -56,10 +62,17 @@ export class ZoteroReaderView extends ItemView {
 				this.state?.source.length === 0 ||
 				this.state?.mdFrontmatter === undefined
 			) {
-				throw new Error(
-					"Invalid state for Zotero Reader view"
-				);
+				return;
 			}
+			this.containerEl.children[0]
+				.querySelector(".view-header-title")
+				?.setText(this.getDisplayText());
+
+			const loader = createDiv({
+				cls: "loader-container",
+			});
+			loader.appendChild(getIcon("zotero-loader-icon")!);
+			this.containerEl.children[1].appendChild(loader);
 
 			const extension = this.state.source.split(".").pop();
 			if (!extension) throw new Error("Invalid file extension");
@@ -104,39 +117,41 @@ export class ZoteroReaderView extends ItemView {
 					});
 					break;
 				default:
-					throw new Error("Unknown source type:" + this.state.sourceType);
+					throw new Error(
+						"Unknown source type:" + this.state.sourceType
+					);
 			}
 		} catch (e) {
 			console.error("Error loading Zotero Reader view:", e);
+			this.containerEl.children[1].empty();
+			const errorMessage = createDiv({
+				cls: "error-message",
+			});
+			errorMessage.setText("Failed to load Zotero Reader");
+			this.containerEl.children[1].appendChild(errorMessage);
 		}
 	}
 
 	async initializeReader(opts: CreateReaderOptions) {
+		const container = this.containerEl.children[1] as HTMLElement;
 		// Create bridge once
 		if (!this.bridge) {
-			const container = this.containerEl.children[1] as HTMLElement;
 			container.style.overflow = "hidden";
 			container.style.padding = "unset";
 
 			this.bridge = new IframeReaderBridge(
 				container,
-				this.BLOB_URL_MAP["reader.html"],
+				(window as any).BLOB_URL_MAP["reader.html"],
 				["app://obsidian.md"]
 			);
 
-			this.bridge.onEvent((evt) => {
-				if (evt.type === "openLink") {
-					// handle in parent (open externally) or show prompt
+			this.bridge.onEvent((evt: ChildEvents) => {
+				if (evt.type === "error") {
+					console.error(`${evt.code}: ${evt.message}`);
 				}
-				// forward other events into Obsidian / status bar
 			});
-			console.log("Connecting to reader bridge...");
-			await this.bridge.connect({
-				blobUrlMap: this.BLOB_URL_MAP,
-				obsidianThemeVariables: extractObsidianStylesVars(),
-				theme: this.theme,
-				version: "1.0.0",
-			});
+
+			await this.bridge.connect();
 
 			// Observe theme changes once and delegate to bridge
 			this.themeObserver = new MutationObserver(() => {
@@ -152,8 +167,7 @@ export class ZoteroReaderView extends ItemView {
 				attributeFilter: ["class"],
 			});
 		}
-
-		await this.bridge.createReader(opts);
+		await this.bridge.initReader(opts);
 	}
 
 	getViewType() {
@@ -162,16 +176,25 @@ export class ZoteroReaderView extends ItemView {
 
 	getDisplayText() {
 		if (this.state && this.state.sourceType && this.state.source) {
-			const fileName =
-				this.state.source.split("/").pop() || "Unknown File";
-			return `Zotero Reader - ${fileName}`;
+			switch (this.state.sourceType) {
+				case "local":
+					return `${this.state.source} (${this.state.mdFile?.path})`;
+				case "url":
+					return `${
+						this.state.source.split("/").pop() || this.state.source
+					} (${this.state.mdFile?.name})`;
+				default:
+					return "Zotero Reader";
+			}
 		}
+
 		return "Zotero Reader";
 	}
 
 	async onOpen() {
+		this.render();
 	}
-	
+
 	async onClose() {
 		this.themeObserver?.disconnect();
 		this.themeObserver = undefined;

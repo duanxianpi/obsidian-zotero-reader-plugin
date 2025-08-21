@@ -101,16 +101,6 @@ export function patchPDFJSViewerHTML(
 	blobMapScript.type = "module";
 	blobMapScript.textContent = `
     globalThis.BLOB_URL_MAP = globalThis.parent.BLOB_URL_MAP;
-
-    const newStylesheet = new CSSStyleSheet();
-    for (const [selector, styles] of Object.entries(globalThis.parent.OBSIDIAN_THEME_VARIABLES)) {
-      newStylesheet.insertRule(
-        \`\${selector} { \${Object.entries(styles)
-          .map(([key, value]) => \`\${key}: \${value};\`)
-          .join(" ")} }\`
-      );
-    }
-    document.adoptedStyleSheets.push(newStylesheet);
   `.trim();
 
 	const patchScript = doc.createElement("script");

@@ -1,0 +1,46 @@
+.loader-container {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	padding-bottom: 10%;
+}
+
+.zotero-loader-icon {
+	width: 30% !important;
+	height: 30% !important;
+}
+
+.loader-outline {
+	fill: none;
+	stroke: var(--interactive-accent);
+	opacity: 0.4;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 2px;
+}
+
+/* animations */
+.loader-animation {
+	fill: none;
+	stroke: var(--interactive-accent);
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-dasharray: 0.5 0.5;
+	stroke-width: 3px;
+	animation: draw-line 2s linear infinite;
+    filter: drop-shadow(0 0 2px var(--interactive-accent));
+}
+
+@keyframes draw-line {
+	0% {
+		stroke-dashoffset: 1;
+	}
+	50% {
+		stroke-dashoffset: 0.5;
+	}
+	100% {
+		stroke-dashoffset: 0;
+	}
+}

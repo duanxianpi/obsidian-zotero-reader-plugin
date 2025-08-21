@@ -14,10 +14,14 @@ import {
 	Vault,
 	View,
 	WorkspaceLeaf,
+	addIcon,
 } from "obsidian";
 
-import { ZoteroReaderView, VIEW_TYPE as READER_VIEW_TYPE } from "./view/zotero-reader-view";
-import { initializeBlobUrls } from "./bundle-reader/inline-reader-resources";
+import {
+	ZoteroReaderView,
+	VIEW_TYPE as READER_VIEW_TYPE,
+} from "./view/zotero-reader-view";
+import { initializeBlobUrls } from "./bundle-assets/inline-assets";
 import { v4 as uuidv4 } from "uuid";
 
 interface ZoteroReaderPluginSettings {
@@ -111,11 +115,37 @@ export default class ZoteroReaderPlugin extends Plugin {
 		await this.loadSettings();
 
 		// Initialize the inline blob URLs need by the reader
-		this.BLOB_URL_MAP = initializeBlobUrls();
+		(window as any).BLOB_URL_MAP = initializeBlobUrls();
+
+		//
+		addIcon(
+			"zotero-icon",
+			`
+			<path
+			style="fill:none;fill-opacity:1;stroke:currentColor;stroke-width:8.33331;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
+			d="m 17.213858,8.3334232 h 65.067213 l 5.218851,9.8385298 -44.69689,56.088003 H 87.163227 V 91.666577 H 17.550592 L 12.500086,81.155337 56.607743,25.992326 H 17.045509 Z"/>
+			`
+		);
+
+		addIcon(
+			"zotero-loader-icon",
+			`
+			<defs>
+			<path
+				id="z"
+				pathLength="1"
+				d="m 17.213858,8.3334232 h 65.067213 l 5.218851,9.8385298 -44.69689,56.088003 H 87.163227 V 91.666577 H 17.550592 L 12.500086,81.155337 56.607743,25.992326 H 17.045509 Z"
+			/>
+			</defs>
+			<!-- faint outline -->
+			<use href="#z" class="loader-outline" />
+			<use href="#z" class="loader-animation" />
+			`
+		);
 
 		// Register the view
 		this.registerView(READER_VIEW_TYPE, (leaf) => {
-			const view = new ZoteroReaderView(leaf, this.BLOB_URL_MAP);
+			const view = new ZoteroReaderView(leaf);
 			return view;
 		});
 
@@ -147,8 +177,8 @@ export default class ZoteroReaderPlugin extends Plugin {
 		this.app.workspace.detachLeavesOfType(READER_VIEW_TYPE);
 
 		// Revoke all blob URLs created by the plugin
-		Object.values(this.BLOB_URL_MAP).forEach((url) => {
-			URL.revokeObjectURL(url);
+		Object.values((window as any).BLOB_URL_MAP).forEach((url) => {
+			URL.revokeObjectURL(url as string);
 		});
 		console.log("Zotero Reader Plugin unloaded");
 	}
@@ -182,7 +212,6 @@ export default class ZoteroReaderPlugin extends Plugin {
 			| Record<string, unknown>
 			| undefined;
 		if (!fm) return false;
-		console.log(fm);
 		return RULES.every((rule) => {
 			const value = fm[rule.key];
 
@@ -222,7 +251,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 				trimmedSource.startsWith("http://") ||
 				trimmedSource.startsWith("https://")
 			) {
-				sourceType = "url";;
+				sourceType = "url";
 			} else {
 				sourceType = "local";
 			}
@@ -275,7 +304,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 
 		// Create a button and insert it into the actions area (next to "pencil/more")
 		const btn = new ButtonComponent(btnContainer);
-		btn.setIcon("monitor-play");
+		btn.setIcon("zotero-icon");
 		btn.setClass("clickable-icon");
 		btn.setClass("view-action");
 		btn.setTooltip("Open as Zotero Reader");

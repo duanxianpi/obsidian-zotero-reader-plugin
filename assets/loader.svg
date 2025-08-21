@@ -1,0 +1,12 @@
+<svg viewBox="0 0 100 100">
+    <defs>
+    <path
+        id="z"
+        pathLength="1"
+        d="m 17.213858,8.3334232 h 65.067213 l 5.218851,9.8385298 -44.69689,56.088003 H 87.163227 V 91.666577 H 17.550592 L 12.500086,81.155337 56.607743,25.992326 H 17.045509 Z"
+    />
+    </defs>
+    <!-- faint outline -->
+    <use href="#z" class="loader-outline" />
+    <use href="#z" class="loader-animation" />
+</svg>

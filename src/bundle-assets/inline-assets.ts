@@ -1,11 +1,12 @@
 import { ungzip } from "pako";
-import { patchPDFJSViewerHTML } from "./patch-inlined-resources";
+import { patchPDFJSViewerHTML } from "./patch-inlined-assets";
 
 const readerContext = require.context(
 	"../../reader/reader/build/obsidian/",
 	true,
 	/.*/
 );
+
 const mimeTypes: Record<string, string> = {
 	".pdf": "application/pdf",
 	".wasm": "application/wasm",
