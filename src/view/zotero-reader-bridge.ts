@@ -106,6 +106,7 @@ export class IframeReaderBridge {
 		if (!this.conn || this.state === "disposed") return;
 		this.state = "disposing";
 		try {
+      console.log("Disposing Zotero Reader bridge");
 			await this.remote?.dispose();
 		} finally {
 			this.conn!.destroy();

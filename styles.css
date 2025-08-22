@@ -30,7 +30,7 @@
 	stroke-dasharray: 0.5 0.5;
 	stroke-width: 3px;
 	animation: draw-line 2s linear infinite;
-    filter: drop-shadow(0 0 2px var(--interactive-accent));
+	filter: drop-shadow(0 0 2px var(--interactive-accent));
 }
 
 @keyframes draw-line {
@@ -43,4 +43,13 @@
 	100% {
 		stroke-dashoffset: 0;
 	}
+}
+
+.error-message {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+    flex-direction: column;
 }

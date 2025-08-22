@@ -5,6 +5,8 @@ import {
 	ItemView,
 	App,
 	getIcon,
+	FileView,
+	ButtonComponent,
 } from "obsidian";
 import { IframeReaderBridge } from "./zotero-reader-bridge";
 import { ChildEvents, CreateReaderOptions, Theme } from "./zotero-reader";
@@ -12,14 +14,14 @@ import { ChildEvents, CreateReaderOptions, Theme } from "./zotero-reader";
 export const VIEW_TYPE = "zotero-reader-view";
 
 interface ReaderViewState extends Record<string, unknown> {
-	mdFile: TFile | null; // Current obsidian file path
-	mdFrontmatter: Record<string, unknown>; // Full frontmatter data
-	noteId: string; // noteid from frontmatter
-	sourceType: "local" | "url" | "obsidian-uri";
-	source: string; // The actual source URL/path
+	file: TFile;
+	previousViewState: Record<string, unknown>;
+	previousViewType: string;
 }
 
 export class ZoteroReaderView extends ItemView {
+	private TOGGLE_MARKDOWN_CONTAINER_ID = "toggle-markdown-icon";
+
 	private bridge?: IframeReaderBridge;
 	private themeObserver?: MutationObserver;
 	private theme: Theme;
@@ -27,9 +29,9 @@ export class ZoteroReaderView extends ItemView {
 	// State properties
 	private state: ReaderViewState;
 
-	constructor(
-		leaf: WorkspaceLeaf,
-	) {
+	private fileFrontmatter: Record<string, unknown> | undefined;
+
+	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
 		this.theme =
 			(getComputedStyle(document.body).colorScheme as Theme) ?? "dark";
@@ -42,28 +44,32 @@ export class ZoteroReaderView extends ItemView {
 	): Promise<void> {
 		// Update internal state
 		this.state = { ...this.state, ...state };
-
 		await super.setState(state, result);
+		console.log("Zotero Reader View state updated:", this.state);
+
+		this.fileFrontmatter = this.app.metadataCache.getFileCache(
+			this.state.file
+		)?.frontmatter as Record<string, unknown> | undefined;
 
 		// Reload view
-		this.render();
+		this.renderReader();
 	}
 
 	getState(): ReaderViewState {
 		return this.state;
 	}
 
-	async render() {
+	async renderReader() {
 		try {
 			if (
 				!this.state ||
-				!this.state?.mdFile ||
-				this.state?.noteId.length === 0 ||
-				this.state?.source.length === 0 ||
-				this.state?.mdFrontmatter === undefined
+				!this.state.file ||
+				!this.state.previousViewState ||
+				!this.state.previousViewType
 			) {
 				return;
 			}
+
 			this.containerEl.children[0]
 				.querySelector(".view-header-title")
 				?.setText(this.getDisplayText());
@@ -74,45 +80,64 @@ export class ZoteroReaderView extends ItemView {
 			loader.appendChild(getIcon("zotero-loader-icon")!);
 			this.containerEl.children[1].appendChild(loader);
 
-			const extension = this.state.source.split(".").pop();
+			console.log(this.state.file);
+			console.log(this.fileFrontmatter);
+
+			const source = this.fileFrontmatter?.["source"] as string;
+
+			const trimmedSource = source.trim();
+			let sourceType: "local" | "url" = "local";
+
+			if (typeof source === "string") {
+				if (
+					trimmedSource.startsWith("http://") ||
+					trimmedSource.startsWith("https://")
+				) {
+					sourceType = "url";
+				} else {
+					sourceType = "local";
+				}
+			}
+
+			const extension = trimmedSource.split(".").pop();
 			if (!extension) throw new Error("Invalid file extension");
-			let type: "pdf" | "epub" | "snapshot";
+			let readerType: "pdf" | "epub" | "snapshot";
 			switch (extension.toLowerCase()) {
 				case "pdf":
-					type = "pdf";
+					readerType = "pdf";
 					break;
 				case "epub":
-					type = "epub";
+					readerType = "epub";
 					break;
 				case "html":
-					type = "snapshot";
+					readerType = "snapshot";
 					break;
 				default:
 					throw new Error("Unsupported file type: " + extension);
 			}
 
-			switch (this.state.sourceType) {
+			switch (sourceType) {
 				case "local":
-					const file = this.app.vault.getAbstractFileByPath(
-						this.state.source
-					);
-					if (!file || !(file instanceof TFile)) {
+					const localFile =
+						this.app.vault.getFileByPath(trimmedSource);
+					if (!localFile || !(localFile instanceof TFile)) {
 						throw new Error(
 							"Local file not found:" + this.state.source
 						);
 					}
-
-					const arrayBuffer = await this.app.vault.readBinary(file);
+					const arrayBuffer = await this.app.vault.readBinary(
+						localFile
+					);
 					await this.initializeReader({
 						data: { buf: new Uint8Array(arrayBuffer) },
-						type: type,
+						type: readerType,
 						obsidianTheme: this.theme,
 					});
 					break;
 				case "url":
 					await this.initializeReader({
-						data: { url: this.state.source },
-						type: type,
+						data: { url: trimmedSource },
+						type: readerType,
 						obsidianTheme: this.theme,
 					});
 					break;
@@ -127,7 +152,12 @@ export class ZoteroReaderView extends ItemView {
 			const errorMessage = createDiv({
 				cls: "error-message",
 			});
-			errorMessage.setText("Failed to load Zotero Reader");
+			errorMessage
+				.createEl("span")
+				.appendText("Failed to load Zotero Reader");
+			errorMessage
+				.createEl("span")
+				.appendText("Error details: " + e.message);
 			this.containerEl.children[1].appendChild(errorMessage);
 		}
 	}
@@ -175,31 +205,62 @@ export class ZoteroReaderView extends ItemView {
 	}
 
 	getDisplayText() {
-		if (this.state && this.state.sourceType && this.state.source) {
-			switch (this.state.sourceType) {
-				case "local":
-					return `${this.state.source} (${this.state.mdFile?.path})`;
-				case "url":
-					return `${
-						this.state.source.split("/").pop() || this.state.source
-					} (${this.state.mdFile?.name})`;
-				default:
-					return "Zotero Reader";
+		if (
+			this.state &&
+			this.state.file &&
+			this.fileFrontmatter &&
+			this.fileFrontmatter["source"]
+		) {
+			const source = (this.fileFrontmatter["source"] as string).trim();
+			if (typeof source === "string") {
+				if (
+					source.startsWith("http://") ||
+					source.startsWith("https://")
+				) {
+					return `${source.split("/").pop() || source} (${
+						this.state.file.name
+					})`;
+				} else {
+					return `${source} (${this.state.file.name})`;
+				}
 			}
 		}
-
 		return "Zotero Reader";
 	}
 
 	async onOpen() {
-		this.render();
+		// Find the actions element in the header, similar to main.ts approach
+		const actionsEl = (this as any).actionsEl as HTMLElement | undefined;
+
+		if (!actionsEl) return;
+
+		const btnContainer = document.createElement("div");
+		btnContainer.id = this.TOGGLE_MARKDOWN_CONTAINER_ID;
+		actionsEl.prepend(btnContainer);
+
+		// Create a button and insert it into the actions area (next to "pencil/more")
+		const btn = new ButtonComponent(btnContainer);
+		btn.setIcon("file-text");
+		btn.setClass("clickable-icon");
+		btn.setClass("view-action");
+		btn.setTooltip("Open as Zotero Reader");
+		btn.onClick(async () => {
+			await this.bridge?.dispose();
+			await this.leaf.setViewState({
+				type: this.state.previousViewType,
+				state: this.state.previousViewState,
+				active: true,
+			});
+		});
+
+		this.renderReader();
 	}
 
 	async onClose() {
 		this.themeObserver?.disconnect();
 		this.themeObserver = undefined;
 		await this.bridge?.dispose();
-		const container = this.containerEl.children[1];
+		const container = this.containerEl;
 		container.empty();
 	}
 }
