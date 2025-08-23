@@ -3,9 +3,10 @@ import type {
 	ChildApi,
 	ParentApi,
 	CreateReaderOptions,
-	Theme,
+	ColorScheme,
 	ChildEvents,
-} from "./zotero-reader";
+} from "../types/zotero-reader";
+import { createEmbeddableMarkdownEditor } from "../editor/markdownEditor";
 
 type BridgeState = "idle" | "connecting" | "ready" | "disposing" | "disposed";
 
@@ -47,6 +48,18 @@ export class IframeReaderBridge {
 		// Parent API exposed to child (event channel)
 		const parentApi: ParentApi = {
 			handleEvent: (evt) => this.listeners.forEach((l) => l(evt)),
+			createEditor: async (containerSelector: string) => {
+        const container = this.iframe!.contentDocument!.querySelector(containerSelector);
+        if (!container) {
+          throw new Error(`Container not found: ${containerSelector}`);
+        }
+				createEmbeddableMarkdownEditor(
+					(window as any).app,
+					container as HTMLElement,
+					{}
+				);
+				return { ok: true };
+			},
 		};
 
 		const messenger = new WindowMessenger({
@@ -96,9 +109,9 @@ export class IframeReaderBridge {
 		});
 	}
 
-	setTheme(theme: Theme) {
+	setColorScheme(colorScheme: ColorScheme) {
 		return this.enqueueOrRun(async () => {
-			await this.remote!.setTheme(theme);
+			await this.remote!.setColorScheme(colorScheme);
 		});
 	}
 
@@ -106,7 +119,7 @@ export class IframeReaderBridge {
 		if (!this.conn || this.state === "disposed") return;
 		this.state = "disposing";
 		try {
-      console.log("Disposing Zotero Reader bridge");
+			console.log("Disposing Zotero Reader bridge");
 			await this.remote?.dispose();
 		} finally {
 			this.conn!.destroy();

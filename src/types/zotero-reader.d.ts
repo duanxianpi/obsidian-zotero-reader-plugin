@@ -1,10 +1,10 @@
-export type Theme = "light" | "dark";
+export type ColorScheme = "light" | "dark";
 
 export interface CreateReaderOptions {
 	data: { buf: Uint8Array } | { url: string };
-    type: string;
+	type: string;
 	sidebarOpen?: boolean;
-	obsidianTheme: Theme;
+	colorScheme: ColorScheme;
 }
 
 export type ChildEvents =
@@ -18,11 +18,12 @@ export type ChildEvents =
 export type ParentApi = {
 	// child → parent
 	handleEvent: (evt: ChildEvents) => void;
+	createEditor: (containerSelector: string) => Promise<{ ok: true }>;
 };
 
 export type ChildApi = {
 	// parent → child
 	initReader: (opts: CreateReaderOptions) => Promise<{ ok: true }>;
-	setTheme: (theme: Theme) => Promise<{ ok: true }>;
+	setColorScheme: (colorScheme: ColorScheme) => Promise<{ ok: true }>;
 	dispose: () => Promise<{ ok: true }>;
 };

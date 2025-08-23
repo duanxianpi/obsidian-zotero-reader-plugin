@@ -3,13 +3,16 @@ import {
 	TFile,
 	ViewStateResult,
 	ItemView,
-	App,
 	getIcon,
-	FileView,
 	ButtonComponent,
 } from "obsidian";
 import { IframeReaderBridge } from "./zotero-reader-bridge";
-import { ChildEvents, CreateReaderOptions, Theme } from "./zotero-reader";
+import {
+	ChildEvents,
+	CreateReaderOptions,
+	ColorScheme,
+} from "../types/zotero-reader";
+import { createEmbeddableMarkdownEditor } from "../editor/markdownEditor";
 
 export const VIEW_TYPE = "zotero-reader-view";
 
@@ -23,8 +26,8 @@ export class ZoteroReaderView extends ItemView {
 	private TOGGLE_MARKDOWN_CONTAINER_ID = "toggle-markdown-icon";
 
 	private bridge?: IframeReaderBridge;
-	private themeObserver?: MutationObserver;
-	private theme: Theme;
+	private colorSchemeObserver?: MutationObserver;
+	private colorScheme: ColorScheme;
 
 	// State properties
 	private state: ReaderViewState;
@@ -33,8 +36,8 @@ export class ZoteroReaderView extends ItemView {
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
-		this.theme =
-			(getComputedStyle(document.body).colorScheme as Theme) ?? "dark";
+		this.colorScheme =
+			(getComputedStyle(document.body).colorScheme as ColorScheme) ?? "dark";
 		this.icon = "zotero-icon";
 	}
 
@@ -116,6 +119,8 @@ export class ZoteroReaderView extends ItemView {
 					throw new Error("Unsupported file type: " + extension);
 			}
 
+			const opts = { colorScheme: this.colorScheme };
+
 			switch (sourceType) {
 				case "local":
 					const localFile =
@@ -128,17 +133,18 @@ export class ZoteroReaderView extends ItemView {
 					const arrayBuffer = await this.app.vault.readBinary(
 						localFile
 					);
+
 					await this.initializeReader({
 						data: { buf: new Uint8Array(arrayBuffer) },
 						type: readerType,
-						obsidianTheme: this.theme,
+						...opts,
 					});
 					break;
 				case "url":
 					await this.initializeReader({
 						data: { url: trimmedSource },
 						type: readerType,
-						obsidianTheme: this.theme,
+						...opts,
 					});
 					break;
 				default:
@@ -183,16 +189,16 @@ export class ZoteroReaderView extends ItemView {
 
 			await this.bridge.connect();
 
-			// Observe theme changes once and delegate to bridge
-			this.themeObserver = new MutationObserver(() => {
-				const newTheme = getComputedStyle(document.body)
-					.colorScheme as Theme;
-				if (newTheme && newTheme !== this.theme) {
-					this.bridge!.setTheme(newTheme);
-					this.theme = newTheme;
+			// Observe color scheme changes once and delegate to bridge
+			this.colorSchemeObserver = new MutationObserver(() => {
+				const newColorScheme = getComputedStyle(document.body)
+					.colorScheme as ColorScheme;
+				if (newColorScheme && newColorScheme !== this.colorScheme) {
+					this.bridge!.setColorScheme(newColorScheme);
+					this.colorScheme = newColorScheme;
 				}
 			});
-			this.themeObserver.observe(document.body, {
+			this.colorSchemeObserver.observe(document.body, {
 				attributes: true,
 				attributeFilter: ["class"],
 			});
@@ -257,8 +263,8 @@ export class ZoteroReaderView extends ItemView {
 	}
 
 	async onClose() {
-		this.themeObserver?.disconnect();
-		this.themeObserver = undefined;
+		this.colorSchemeObserver?.disconnect();
+		this.colorSchemeObserver = undefined;
 		await this.bridge?.dispose();
 		const container = this.containerEl;
 		container.empty();

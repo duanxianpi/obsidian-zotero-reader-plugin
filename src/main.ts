@@ -15,6 +15,8 @@ import {
 	View,
 	WorkspaceLeaf,
 	addIcon,
+	MarkdownRenderer,
+	Component,
 } from "obsidian";
 
 import {
@@ -58,6 +60,10 @@ export default class ZoteroReaderPlugin extends Plugin {
 	BLOB_URL_MAP: Record<string, string>;
 
 	async onload() {
+		(window as any).MarkdownRender = (container: HTMLElement, markdown:string) => {
+			MarkdownRenderer.render(this.app, markdown, container, "", new Component());
+
+		};
 		await this.loadSettings();
 
 		// Initialize the inline blob URLs need by the reader
@@ -201,7 +207,6 @@ export default class ZoteroReaderPlugin extends Plugin {
 		this.removeIconFrom(actionsEl);
 
 		// Check if the file satisfies all rules
-		console.log("File satisfies all rules?", file);
 		if (!this.satisfiesAllRules(file)) return;
 
 		const btnContainer = document.createElement("div");
