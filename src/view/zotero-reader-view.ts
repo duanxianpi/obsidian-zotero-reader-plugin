@@ -178,7 +178,7 @@ export class ZoteroReaderView extends ItemView {
 			this.bridge = new IframeReaderBridge(
 				container,
 				(window as any).BLOB_URL_MAP["reader.html"],
-				["app://obsidian.md"]
+				["*"]
 			);
 
 			this.bridge.onEvent((evt: ChildEvents) => {

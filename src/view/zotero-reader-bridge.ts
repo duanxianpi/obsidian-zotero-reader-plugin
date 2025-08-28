@@ -22,7 +22,7 @@ export class IframeReaderBridge {
 	constructor(
 		private container: HTMLElement,
 		private src: string,
-		private allowedOrigins: string[] = ["app://obsidian.md"]
+		private allowedOrigins: string[] = ["*"]
 	) {}
 
 	onEvent(cb: (e: ChildEvents) => void) {
@@ -49,10 +49,15 @@ export class IframeReaderBridge {
 		const parentApi: ParentApi = {
 			handleEvent: (evt) => this.listeners.forEach((l) => l(evt)),
 			createEditor: async (containerSelector: string) => {
-        const container = this.iframe!.contentDocument!.querySelector(containerSelector);
-        if (!container) {
-          throw new Error(`Container not found: ${containerSelector}`);
-        }
+				const container =
+					this.iframe!.contentDocument!.querySelector(
+						containerSelector
+					);
+				if (!container) {
+					throw new Error(
+						`Container not found: ${containerSelector}`
+					);
+				}
 				createEmbeddableMarkdownEditor(
 					(window as any).app,
 					container as HTMLElement,

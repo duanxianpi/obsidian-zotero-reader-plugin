@@ -69,7 +69,10 @@ export default class ZoteroReaderPlugin extends Plugin {
 		// Initialize the inline blob URLs need by the reader
 		(window as any).BLOB_URL_MAP = initializeBlobUrls();
 
-		//
+		// Ensure MathJax is loaded
+		MarkdownRenderer.render(this.app, "$\\int$", document.createElement("div"), "", new Component());
+
+		// Add custom icons
 		addIcon(
 			"zotero-icon",
 			`
