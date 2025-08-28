@@ -61,7 +61,10 @@ export class IframeReaderBridge {
 				createEmbeddableMarkdownEditor(
 					(window as any).app,
 					container as HTMLElement,
-					{}
+					{
+						value: "test $f$ \n $$\sum^0_1 \\frac{1}{x}$$",
+						cls: "obsidian-app"
+					}
 				);
 				return { ok: true };
 			},

@@ -1,4 +1,3 @@
-//@ts-ignore
 import {
 	App,
 	MarkdownScrollableEditView,
@@ -43,6 +42,7 @@ function resolveEditorPrototype(app: App): any {
 		""
 	) as WidgetEditorView;
 
+	console.log("Temporary editor created", widgetEditorView);
 	// Mark as editable to instantiate the editor
 	widgetEditorView.editable = true;
 	widgetEditorView.showEditor();
@@ -145,6 +145,23 @@ export class EmbeddableMarkdownEditor {
 		// Store reference to self for the patched method BEFORE using it
 		const self = this;
 
+		const handleSuggestionPanelKeyEvent = (key: string) => {
+			const isSuggesting =
+				self.editor.editorSuggest.currentSuggest &&
+				//@ts-ignore
+				self.editor.editorSuggest.currentSuggest.isOpen;
+			// For suggesting, pass the event to the parent window
+			isSuggesting &&
+				window.parent.dispatchEvent(
+					new KeyboardEvent("keydown", {
+						key: key,
+					})
+				);
+
+			console.log(self.editor.editorSuggest.currentSuggest);
+			return isSuggesting;
+		};
+
 		// Use monkey-around to safely patch the method
 		const uninstaller = around(EditorClass.prototype, {
 			buildLocalExtensions: (originalMethod: any) =>
@@ -183,35 +200,34 @@ export class EmbeddableMarkdownEditor {
 						// Add keyboard handlers
 						const keyBindings = [
 							{
+								key: "ArrowUp",
+								run: () =>
+									handleSuggestionPanelKeyEvent("ArrowUp"),
+							},
+							{
+								key: "ArrowDown",
+								run: () =>
+									handleSuggestionPanelKeyEvent("ArrowDown"),
+							},
+							{
 								key: "Enter",
 								run: () => {
-									return self.options.onEnter(
-										self,
-										false,
-										false
+									return (
+										handleSuggestionPanelKeyEvent(
+											"Enter"
+										) ||
+										self.options.onEnter(self, false, false)
 									);
 								},
 								shift: () =>
-									self.options.onEnter(
-										self,
-										false,
-										true
-									),
+									self.options.onEnter(self, false, true),
 							},
 							{
 								key: "Mod-Enter",
 								run: () =>
-									self.options.onEnter(
-										self,
-										true,
-										false
-									),
+									self.options.onEnter(self, true, false),
 								shift: () =>
-									self.options.onEnter(
-										self,
-										true,
-										true
-									),
+									self.options.onEnter(self, true, true),
 							},
 							{
 								key: "Escape",
@@ -246,14 +262,15 @@ export class EmbeddableMarkdownEditor {
 							};
 						}
 
-						extensions.push(
-							Prec.highest(keymap.of(keyBindings))
-						);
+						extensions.push(Prec.highest(keymap.of(keyBindings)));
 					}
 
 					return extensions;
 				},
 		});
+
+		// Add obsidian-app class to the editor container, apply obsidian styles
+		container.classList.toggle("obsidian-app", true);
 
 		// Create the editor with the app instance
 		this.editor = new EditorClass(app, container, {
@@ -262,6 +279,8 @@ export class EmbeddableMarkdownEditor {
 			onMarkdownScroll: () => {},
 			getMode: () => "source",
 		});
+
+		console.log("Editor created", this.editor);
 
 		// Register the uninstaller for cleanup
 		this.register(uninstaller);
@@ -273,6 +292,7 @@ export class EmbeddableMarkdownEditor {
 		}
 
 		// Set initial content
+		console.log("Initial content set:", options.value || "");
 		this.set(options.value || "", false);
 
 		// Prevent active leaf changes while focused
