@@ -37,7 +37,8 @@ export class ZoteroReaderView extends ItemView {
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
 		this.colorScheme =
-			(getComputedStyle(document.body).colorScheme as ColorScheme) ?? "dark";
+			(getComputedStyle(document.body).colorScheme as ColorScheme) ??
+			"dark";
 		this.icon = "zotero-icon";
 	}
 
@@ -63,95 +64,27 @@ export class ZoteroReaderView extends ItemView {
 	}
 
 	async renderReader() {
+		if (
+			!this.state ||
+			!this.state.file ||
+			!this.state.previousViewState ||
+			!this.state.previousViewType
+		) {
+			return;
+		}
+
+		this.containerEl.children[0]
+			.querySelector(".view-header-title")
+			?.setText(this.getDisplayText());
+
+		const loader = createDiv({
+			cls: "loader-container",
+		});
+		loader.appendChild(getIcon("zotero-loader-icon")!);
+		this.containerEl.children[1].appendChild(loader);
+		
 		try {
-			if (
-				!this.state ||
-				!this.state.file ||
-				!this.state.previousViewState ||
-				!this.state.previousViewType
-			) {
-				return;
-			}
-
-			this.containerEl.children[0]
-				.querySelector(".view-header-title")
-				?.setText(this.getDisplayText());
-
-			const loader = createDiv({
-				cls: "loader-container",
-			});
-			loader.appendChild(getIcon("zotero-loader-icon")!);
-			this.containerEl.children[1].appendChild(loader);
-
-			console.log(this.state.file);
-			console.log(this.fileFrontmatter);
-
-			const source = this.fileFrontmatter?.["source"] as string;
-
-			const trimmedSource = source.trim();
-			let sourceType: "local" | "url" = "local";
-
-			if (typeof source === "string") {
-				if (
-					trimmedSource.startsWith("http://") ||
-					trimmedSource.startsWith("https://")
-				) {
-					sourceType = "url";
-				} else {
-					sourceType = "local";
-				}
-			}
-
-			const extension = trimmedSource.split(".").pop();
-			if (!extension) throw new Error("Invalid file extension");
-			let readerType: "pdf" | "epub" | "snapshot";
-			switch (extension.toLowerCase()) {
-				case "pdf":
-					readerType = "pdf";
-					break;
-				case "epub":
-					readerType = "epub";
-					break;
-				case "html":
-					readerType = "snapshot";
-					break;
-				default:
-					throw new Error("Unsupported file type: " + extension);
-			}
-
-			const opts = { colorScheme: this.colorScheme };
-
-			switch (sourceType) {
-				case "local":
-					const localFile =
-						this.app.vault.getFileByPath(trimmedSource);
-					if (!localFile || !(localFile instanceof TFile)) {
-						throw new Error(
-							"Local file not found:" + this.state.source
-						);
-					}
-					const arrayBuffer = await this.app.vault.readBinary(
-						localFile
-					);
-
-					await this.initializeReader({
-						data: { buf: new Uint8Array(arrayBuffer) },
-						type: readerType,
-						...opts,
-					});
-					break;
-				case "url":
-					await this.initializeReader({
-						data: { url: trimmedSource },
-						type: readerType,
-						...opts,
-					});
-					break;
-				default:
-					throw new Error(
-						"Unknown source type:" + this.state.sourceType
-					);
-			}
+			await this.initializeReader();
 		} catch (e) {
 			console.error("Error loading Zotero Reader view:", e);
 			this.containerEl.children[1].empty();
@@ -168,7 +101,7 @@ export class ZoteroReaderView extends ItemView {
 		}
 	}
 
-	async initializeReader(opts: CreateReaderOptions) {
+	async initializeReader() {
 		const container = this.containerEl.children[1] as HTMLElement;
 		// Create bridge once
 		if (!this.bridge) {
@@ -181,13 +114,36 @@ export class ZoteroReaderView extends ItemView {
 				["*"]
 			);
 
-			this.bridge.onEvent((evt: ChildEvents) => {
-				if (evt.type === "error") {
-					console.error(`${evt.code}: ${evt.message}`);
-				}
+			// Register event listeners
+			this.bridge.onEventType("error", (evt) => {
+				console.error(`${evt.code}: ${evt.message}`);
 			});
 
-			await this.bridge.connect();
+			this.bridge.onEventType("ready", (evt) => {
+				console.log("Reader is ready");
+			});
+
+			this.bridge.onEventType("sidebarToggled", (evt) => {
+				console.log("Sidebar toggled:", evt.open);
+			});
+
+			this.bridge.onEventType("openLink", (evt) => {
+				console.log("Opening link:", evt.url);
+				// Handle link opening logic here
+			});
+
+			this.bridge.onEventType("annotationsSaved", (evt) => {
+				console.log("Annotations saved:", evt.annotations);
+			});
+
+			this.bridge.onEventType("viewStateChanged", (evt) => {
+				console.log(
+					"View state changed:",
+					evt.state,
+					"Primary:",
+					evt.primary
+				);
+			});
 
 			// Observe color scheme changes once and delegate to bridge
 			this.colorSchemeObserver = new MutationObserver(() => {
@@ -202,8 +158,71 @@ export class ZoteroReaderView extends ItemView {
 				attributes: true,
 				attributeFilter: ["class"],
 			});
+
+			await this.bridge.connect();
 		}
-		await this.bridge.initReader(opts);
+
+		const source = this.fileFrontmatter?.["source"] as string;
+
+		const trimmedSource = source.trim();
+		let sourceType: "local" | "url" = "local";
+
+		if (typeof source === "string") {
+			if (
+				trimmedSource.startsWith("http://") ||
+				trimmedSource.startsWith("https://")
+			) {
+				sourceType = "url";
+			} else {
+				sourceType = "local";
+			}
+		}
+
+		const extension = trimmedSource.split(".").pop();
+		if (!extension) throw new Error("Invalid file extension");
+		let readerType: "pdf" | "epub" | "snapshot";
+		switch (extension.toLowerCase()) {
+			case "pdf":
+				readerType = "pdf";
+				break;
+			case "epub":
+				readerType = "epub";
+				break;
+			case "html":
+				readerType = "snapshot";
+				break;
+			default:
+				throw new Error("Unsupported file type: " + extension);
+		}
+
+		const opts = { colorScheme: this.colorScheme };
+
+		switch (sourceType) {
+			case "local":
+				const localFile = this.app.vault.getFileByPath(trimmedSource);
+				if (!localFile || !(localFile instanceof TFile)) {
+					throw new Error(
+						"Local file not found:" + this.state.source
+					);
+				}
+				const arrayBuffer = await this.app.vault.readBinary(localFile);
+
+				await this.bridge.initReader({
+					data: { buf: new Uint8Array(arrayBuffer) },
+					type: readerType,
+					...opts,
+				});
+				break;
+			case "url":
+				await this.bridge.initReader({
+					data: { url: trimmedSource },
+					type: readerType,
+					...opts,
+				});
+				break;
+			default:
+				throw new Error("Unknown source type:" + this.state.sourceType);
+		}
 	}
 
 	getViewType() {

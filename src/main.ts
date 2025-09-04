@@ -33,6 +33,7 @@ const DEFAULT_SETTINGS: ZoteroReaderPluginSettings = {
 	mySetting: "default",
 };
 
+
 const TOGGLE_ICON_CONTAINER_ID = "zotero-reader-toggle-container";
 type ReaderIconDisplayRule = {
 	key: string;
@@ -106,7 +107,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 
 		// Register the event for reader icon display
 		this.registerEvent(
-			this.app.workspace.on("active-leaf-change", () => {
+			this.app.workspace.on("file-open", () => {
 				this.initHeaderToggleButton();
 			})
 		);

@@ -1,3 +1,5 @@
+import { Editor } from "obsidian";
+
 export type ColorScheme = "light" | "dark";
 
 export interface CreateReaderOptions {
@@ -10,10 +12,22 @@ export interface CreateReaderOptions {
 export type ChildEvents =
 	| { type: "ready" }
 	| { type: "error"; code: string; message: string }
+	| { type: "addToNote" }
+	| { type: "annotationsSaved"; annotations: unknown }
+	| { type: "annotationsDeleted"; ids: string }
 	| { type: "viewStateChanged"; state: unknown; primary: boolean }
-	| { type: "annotationsSaved"; count: number }
+	| { type: "openTagsPopup"; annotationID: unknown; left: number; top: number }
+	| { type: "closePopup"; data: unknown }
+	| { type: "openLink"; url: string }
 	| { type: "sidebarToggled"; open: boolean }
-	| { type: "openLink"; url: string };
+	| { type: "sidebarWidthChanged"; width: number }
+	| { type: "setDataTransferAnnotations"; dataTransfer: unknown; annotations: unknown; fromText: unknown }
+	| { type: "confirm"; title: string; text: string; confirmationButtonTitle: string }
+	| { type: "rotatePages"; pageIndexes: unknown; degrees: unknown }
+	| { type: "deletePages"; pageIndexes: unknown; degrees: unknown }
+	| { type: "toggleContextPane" }
+	| { type: "textSelectionAnnotationModeChanged"; mode: unknown }
+	| { type: "saveCustomThemes"; customThemes: unknown }
 
 export type ParentApi = {
 	// child → parent
@@ -25,5 +39,37 @@ export type ChildApi = {
 	// parent → child
 	initReader: (opts: CreateReaderOptions) => Promise<{ ok: true }>;
 	setColorScheme: (colorScheme: ColorScheme) => Promise<{ ok: true }>;
-	dispose: () => Promise<{ ok: true }>;
+	destroy: () => Promise<{ ok: true }>;
 };
+
+
+export interface ZoteroPosition {
+	pageIndex: number;
+	rects: number[][];
+}
+
+export interface ZoteroAnnotation {
+	type: string;
+	color: string;
+	sortIndex: string;
+	pageLabel: string;
+	position: ZoteroPosition;
+	tags: string[];
+	id: string;
+	dateCreated: string;
+	dateModified: string;
+	[key: string]: any; // Allow additional properties
+}
+
+export interface ParsedAnnotationBlock {
+	id: string;
+	zoteroLink: string;
+	title: string;
+	pageNumber: string;
+	annotationText: string;
+	comments: string;
+	metadata: ZoteroAnnotation;
+	rawText: string;
+	startLine: number;
+	endLine: number;
+}

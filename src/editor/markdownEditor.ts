@@ -152,13 +152,14 @@ export class EmbeddableMarkdownEditor {
 				self.editor.editorSuggest.currentSuggest.isOpen;
 			// For suggesting, pass the event to the parent window
 			isSuggesting &&
-				window.parent.dispatchEvent(
+				//@ts-ignore
+				self.editor.editorSuggest.currentSuggest.suggestEl.dispatchEvent(
 					new KeyboardEvent("keydown", {
 						key: key,
 					})
 				);
 
-			console.log(self.editor.editorSuggest.currentSuggest);
+			console.log(self.editor);
 			return isSuggesting;
 		};
 
@@ -208,6 +209,10 @@ export class EmbeddableMarkdownEditor {
 								key: "ArrowDown",
 								run: () =>
 									handleSuggestionPanelKeyEvent("ArrowDown"),
+							},
+							{
+								key: "Tab",
+								run: () => handleSuggestionPanelKeyEvent("Tab"),
 							},
 							{
 								key: "Enter",
@@ -278,7 +283,11 @@ export class EmbeddableMarkdownEditor {
 			// This mocks the MarkdownView functions, required for proper scrolling
 			onMarkdownScroll: () => {},
 			getMode: () => "source",
+			syncScroll: () => {},
 		});
+
+		//@ts-ignore
+		window.parent.testEditor = this.editor;
 
 		console.log("Editor created", this.editor);
 
