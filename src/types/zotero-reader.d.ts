@@ -1,4 +1,3 @@
-import { Editor } from "obsidian";
 
 export type ColorScheme = "light" | "dark";
 
@@ -7,27 +6,43 @@ export interface CreateReaderOptions {
 	type: string;
 	sidebarOpen?: boolean;
 	colorScheme: ColorScheme;
+	annotations: ZoteroAnnotation[];
 }
 
 export type ChildEvents =
 	| { type: "ready" }
 	| { type: "error"; code: string; message: string }
 	| { type: "addToNote" }
-	| { type: "annotationsSaved"; annotations: unknown }
+	| { type: "annotationsSaved"; annotations: ZoteroAnnotation[] }
 	| { type: "annotationsDeleted"; ids: string }
 	| { type: "viewStateChanged"; state: unknown; primary: boolean }
-	| { type: "openTagsPopup"; annotationID: unknown; left: number; top: number }
+	| {
+			type: "openTagsPopup";
+			annotationID: unknown;
+			left: number;
+			top: number;
+	  }
 	| { type: "closePopup"; data: unknown }
 	| { type: "openLink"; url: string }
 	| { type: "sidebarToggled"; open: boolean }
 	| { type: "sidebarWidthChanged"; width: number }
-	| { type: "setDataTransferAnnotations"; dataTransfer: unknown; annotations: unknown; fromText: unknown }
-	| { type: "confirm"; title: string; text: string; confirmationButtonTitle: string }
+	| {
+			type: "setDataTransferAnnotations";
+			dataTransfer: unknown;
+			annotations: unknown;
+			fromText: unknown;
+	  }
+	| {
+			type: "confirm";
+			title: string;
+			text: string;
+			confirmationButtonTitle: string;
+	  }
 	| { type: "rotatePages"; pageIndexes: unknown; degrees: unknown }
 	| { type: "deletePages"; pageIndexes: unknown; degrees: unknown }
 	| { type: "toggleContextPane" }
 	| { type: "textSelectionAnnotationModeChanged"; mode: unknown }
-	| { type: "saveCustomThemes"; customThemes: unknown }
+	| { type: "saveCustomThemes"; customThemes: unknown };
 
 export type ParentApi = {
 	// child → parent
@@ -42,7 +57,6 @@ export type ChildApi = {
 	destroy: () => Promise<{ ok: true }>;
 };
 
-
 export interface ZoteroPosition {
 	pageIndex: number;
 	rects: number[][];
@@ -54,22 +68,23 @@ export interface ZoteroAnnotation {
 	sortIndex: string;
 	pageLabel: string;
 	position: ZoteroPosition;
+	text: string;
+	comment: string;
 	tags: string[];
 	id: string;
 	dateCreated: string;
 	dateModified: string;
+	authorName: string;
+	isAuthorNameAuthoritative: boolean;
 	[key: string]: any; // Allow additional properties
 }
 
-export interface ParsedAnnotationBlock {
+export interface ParsedAnnotation {
 	id: string;
-	zoteroLink: string;
-	title: string;
-	pageNumber: string;
-	annotationText: string;
-	comments: string;
-	metadata: ZoteroAnnotation;
-	rawText: string;
-	startLine: number;
-	endLine: number;
+	header?: string;
+	text: string;
+	comment: string;
+	json: ZoteroAnnotation; // raw JSON object (parsed)
+	range: { start: number; end: number };
+	raw: string;
 }

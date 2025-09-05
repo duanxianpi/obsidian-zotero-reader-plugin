@@ -51,5 +51,27 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-    flex-direction: column;
+	flex-direction: column;
+}
+
+.cm-ozrp-anno-comment {
+	font-size: var(--font-smallest);
+	color: var(--code-comment);
+}
+
+.is-live-preview .cm-ozrp-anno-json-line:not(.cm-active) {
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+.is-live-preview .cm-ozrp-anno-json-line:not(.cm-active)::after {
+	content: "...";
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	background-color: var(--background-primary);
+	color: var(--code-comment);
+	font-size: var(--font-smallest);
+	text-align: end;
+	padding-left: 5px;
 }

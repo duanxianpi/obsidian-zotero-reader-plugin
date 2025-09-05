@@ -24,6 +24,7 @@ import {
 	VIEW_TYPE as READER_VIEW_TYPE,
 } from "./view/zotero-reader-view";
 import { initializeBlobUrls } from "./bundle-assets/inline-assets";
+import { ozrpAnnoCommentExtension } from "./editor/ozrpAnnoCommentExtension";
 
 interface ZoteroReaderPluginSettings {
 	mySetting: string;
@@ -32,7 +33,6 @@ interface ZoteroReaderPluginSettings {
 const DEFAULT_SETTINGS: ZoteroReaderPluginSettings = {
 	mySetting: "default",
 };
-
 
 const TOGGLE_ICON_CONTAINER_ID = "zotero-reader-toggle-container";
 type ReaderIconDisplayRule = {
@@ -61,17 +61,22 @@ export default class ZoteroReaderPlugin extends Plugin {
 	BLOB_URL_MAP: Record<string, string>;
 
 	async onload() {
-		(window as any).MarkdownRender = (container: HTMLElement, markdown:string) => {
-			MarkdownRenderer.render(this.app, markdown, container, "", new Component());
-
-		};
 		await this.loadSettings();
 
 		// Initialize the inline blob URLs need by the reader
 		(window as any).BLOB_URL_MAP = initializeBlobUrls();
 
 		// Ensure MathJax is loaded
-		MarkdownRenderer.render(this.app, "$\\int$", document.createElement("div"), "", new Component());
+		MarkdownRenderer.render(
+			this.app,
+			"$\\int$",
+			document.createElement("div"),
+			"",
+			new Component()
+		);
+
+		// Register the annotation comment extension
+		this.registerEditorExtension(ozrpAnnoCommentExtension());
 
 		// Add custom icons
 		addIcon(
@@ -227,7 +232,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 			await activeView.leaf.setViewState({
 				type: READER_VIEW_TYPE,
 				state: {
-					file: file,
+					sourceFilePath: file.path,
 					previousViewState: activeView.getState(),
 					previousViewType: activeView.getViewType(),
 				},

@@ -11,28 +11,31 @@ import {
 	ChildEvents,
 	CreateReaderOptions,
 	ColorScheme,
+	ZoteroAnnotation,
 } from "../types/zotero-reader";
-import { createEmbeddableMarkdownEditor } from "../editor/markdownEditor";
+import { AnnotationManager } from "./annotation-manager";
 
 export const VIEW_TYPE = "zotero-reader-view";
 
 interface ReaderViewState extends Record<string, unknown> {
-	file: TFile;
+	sourceFilePath: string;
 	previousViewState: Record<string, unknown>;
 	previousViewType: string;
 }
 
 export class ZoteroReaderView extends ItemView {
 	private TOGGLE_MARKDOWN_CONTAINER_ID = "toggle-markdown-icon";
+	
+	private file: TFile | null;
+	private fileFrontmatter?: Record<string, unknown>;
 
 	private bridge?: IframeReaderBridge;
 	private colorSchemeObserver?: MutationObserver;
 	private colorScheme: ColorScheme;
+	private annotationManager: AnnotationManager;
 
 	// State properties
 	private state: ReaderViewState;
-
-	private fileFrontmatter: Record<string, unknown> | undefined;
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -40,6 +43,12 @@ export class ZoteroReaderView extends ItemView {
 			(getComputedStyle(document.body).colorScheme as ColorScheme) ??
 			"dark";
 		this.icon = "zotero-icon";
+		
+		// Initialize annotation manager
+		this.annotationManager = new AnnotationManager(
+			this.app.vault,
+			this.app.metadataCache
+		);
 	}
 
 	async setState(
@@ -49,10 +58,14 @@ export class ZoteroReaderView extends ItemView {
 		// Update internal state
 		this.state = { ...this.state, ...state };
 		await super.setState(state, result);
-		console.log("Zotero Reader View state updated:", this.state);
+
+		this.file = this.app.vault.getFileByPath(this.state.sourceFilePath);
+		if (!this.file || !(this.file instanceof TFile)) {
+			return;
+		}
 
 		this.fileFrontmatter = this.app.metadataCache.getFileCache(
-			this.state.file
+			this.file
 		)?.frontmatter as Record<string, unknown> | undefined;
 
 		// Reload view
@@ -66,9 +79,10 @@ export class ZoteroReaderView extends ItemView {
 	async renderReader() {
 		if (
 			!this.state ||
-			!this.state.file ||
+			!this.state.sourceFilePath ||
 			!this.state.previousViewState ||
-			!this.state.previousViewType
+			!this.state.previousViewType ||
+			!this.file
 		) {
 			return;
 		}
@@ -81,13 +95,15 @@ export class ZoteroReaderView extends ItemView {
 			cls: "loader-container",
 		});
 		loader.appendChild(getIcon("zotero-loader-icon")!);
-		this.containerEl.children[1].appendChild(loader);
-		
+		const container = this.containerEl.children[1] as HTMLElement;
+		container.empty();
+		container.appendChild(loader);
+
 		try {
 			await this.initializeReader();
 		} catch (e) {
 			console.error("Error loading Zotero Reader view:", e);
-			this.containerEl.children[1].empty();
+			container.empty();
 			const errorMessage = createDiv({
 				cls: "error-message",
 			});
@@ -97,7 +113,7 @@ export class ZoteroReaderView extends ItemView {
 			errorMessage
 				.createEl("span")
 				.appendText("Error details: " + e.message);
-			this.containerEl.children[1].appendChild(errorMessage);
+			container.appendChild(errorMessage);
 		}
 	}
 
@@ -195,7 +211,13 @@ export class ZoteroReaderView extends ItemView {
 				throw new Error("Unsupported file type: " + extension);
 		}
 
-		const opts = { colorScheme: this.colorScheme };
+		// Parse annotations from the current markdown file
+		const annotations = await this.parseAnnotationsFromFile();
+
+		const opts = { 
+			colorScheme: this.colorScheme,
+			annotations: annotations
+		};
 
 		switch (sourceType) {
 			case "local":
@@ -225,6 +247,27 @@ export class ZoteroReaderView extends ItemView {
 		}
 	}
 
+	/**
+	 * Parse annotations from the current markdown file
+	 */
+	private async parseAnnotationsFromFile(): Promise<ZoteroAnnotation[]> {
+		if (!this.file) {
+			return [];
+		}
+
+		try {
+			const parsedAnnotations = await this.annotationManager.getParsedAnnotations(this.file);
+
+			const annotations = parsedAnnotations.map((a) => ({...a.json, text: a.text, comment: a.comment}));
+
+			// Extract ZoteroAnnotation
+			return annotations;
+		} catch (error) {
+			console.error("Error parsing annotations from file:", error);
+			return [];
+		}
+	}
+
 	getViewType() {
 		return VIEW_TYPE;
 	}
@@ -232,7 +275,8 @@ export class ZoteroReaderView extends ItemView {
 	getDisplayText() {
 		if (
 			this.state &&
-			this.state.file &&
+			this.state.sourceFilePath &&
+			this.file &&
 			this.fileFrontmatter &&
 			this.fileFrontmatter["source"]
 		) {
@@ -243,10 +287,10 @@ export class ZoteroReaderView extends ItemView {
 					source.startsWith("https://")
 				) {
 					return `${source.split("/").pop() || source} (${
-						this.state.file.name
+						this.file.name
 					})`;
 				} else {
-					return `${source} (${this.state.file.name})`;
+					return `${source} (${this.file.name})`;
 				}
 			}
 		}

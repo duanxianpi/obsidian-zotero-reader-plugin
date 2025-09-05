@@ -1,314 +1,256 @@
-/**
- * Annotation Parser Module
- * 
- * This module provides functionality to parse, extract, modify, and manage
- * Zotero annotations in Obsidian markdown files with the following pattern:
- * 
- * > [!info] [[zotero://xxx.pdf | Here is a title, p.0]]
- * >> Here's a annotation text
- * >
- * > Comments
- * > %% { "type": "underline", "color": "#ff6666", ... }
- */
+import { ParsedAnnotation, ZoteroAnnotation } from "../types/zotero-reader";
 
-import { ParsedAnnotationBlock, ZoteroAnnotation } from "src/types/zotero-reader";
+/** Internal constants for the block markers */
+export const OzrpAnnoMarks = {
+	BEGIN: "%% OZRP-ANNO-BEGIN %%",
+	END: "%% OZRP-ANNO-END %%",
+	Q_BEGIN: "%% OZRP-ANNO-QUOTE-BEGIN %%",
+	Q_END: "%% OZRP-ANNO-QUOTE-END %%",
+	C_BEGIN: "%% OZRP-ANNO-COMM-BEGIN %%",
+	C_END: "%% OZRP-ANNO-COMM-END %%",
+	J_INLINE_BEGIN: "%% OZRP-ANNO-JSON-BEGIN",
+	J_INLINE_END: "OZRP-ANNO-JSON-END %%",
+} as const;
+
+/**
+ * FNV-1a 32-bit hash → hex string (deterministic, small, fast)
+ */
+function fnv1aHex(input: string): string {
+	let h = 0x811c9dc5 >>> 0;
+	for (let i = 0; i < input.length; i++) {
+		h ^= input.charCodeAt(i);
+		// 32-bit FNV prime: 16777619
+		h = Math.imul(h, 0x01000193) >>> 0;
+	}
+	return ("00000000" + h.toString(16)).slice(-8);
+}
+
+/**
+ * Try to derive a stable id from the JSON; fallback to hash of salient fields.
+ */
+export function computeAnnotationId(
+	json: ZoteroAnnotation,
+	text: string,
+	comment: string
+): string {
+	const candidate = json.id;
+	if (typeof candidate === "string" && candidate.trim())
+		return candidate.trim();
+	const payload = JSON.stringify(json) + "\u241E" + text + "\u241E" + comment;
+	return fnv1aHex(payload);
+}
+
+/**
+ * We match entire sections including markers, capturing the inner body for parsing.
+ * Leading blockquote/space prefixes are tolerated and normalized out during parsing.
+ */
+const SECTION_WITH_MARKERS_RE = new RegExp(
+	String.raw`(^[>\t ]*%%\s*OZRP-ANNO-BEGIN\s*%%[\t ]*(?:\r?\n))` + // group 1: begin line (with trailing NL)
+		String.raw`([\s\S]*?)` + // group 2: inner body (non-greedy)
+		String.raw`(?=^[>\t ]*%%\s*OZRP-ANNO-END\s*%%[\t ]*$)`, // lookahead up to END line
+	"gm"
+);
+const SECTION_END_LINE_RE = /^[>\t ]*%%\s*OZRP-ANNO-END\s*%%[\t ]*$/gm;
+
+// Inside a normalized section (no leading ">"), capture header + chunks
+const HEADER_LINE_RE = /^(?:\s*>\s*)?\[!info\][\s\S]*$/m; // optional, very loose
+const QUOTE_BLOCK_RE = new RegExp(
+	String.raw`%%\s*OZRP-ANNO-QUOTE-BEGIN\s*%%\s*\r?\n?` +
+		String.raw`([\s\S]*?)` +
+		String.raw`\r?\n?%%\s*OZRP-ANNO-QUOTE-END\s*%%`,
+	"m"
+);
+const COMM_BLOCK_RE = new RegExp(
+	String.raw`%%\s*OZRP-ANNO-COMM-BEGIN\s*%%\s*\r?\n?` +
+		String.raw`([\s\S]*?)` +
+		String.raw`\r?\n?%%\s*OZRP-ANNO-COMM-END\s*%%`,
+	"m"
+);
+const JSON_INLINE_RE = new RegExp(
+	String.raw`%%\s*OZRP-ANNO-JSON-BEGIN\b` +
+		String.raw`[\t ]*` +
+		String.raw`(\{[\s\S]*?\})` + // grab the JSON object between the nearest braces
+		String.raw`\s*OZRP-ANNO-JSON-END\s*%%`,
+	"m"
+);
+
+/** Strip a single leading blockquote / whitespace prefix from each line. */
+function stripBlockquotePrefix(text: string): string {
+	return text
+		.split(/\r?\n/)
+		.map((line) => line.replace(/^[>\t ]+/, ""))
+		.join("\n")
+		.trim();
+}
+
+/** Normalize a captured section body so inner markers are visible (remove ">/spaces"). */
+function normalizeSectionBody(sectionBody: string): string {
+	return sectionBody
+		.split(/\r?\n/)
+		.map((line) => line.replace(/^[>\t ]+/, ""))
+		.join("\n");
+}
+
+/** Extracts header (first non-empty quoted line that looks like a callout) */
+function extractHeader(normalized: string): string | undefined {
+	const m = normalized.match(HEADER_LINE_RE);
+	if (!m) return undefined;
+	// Trim any leading blockquote remnants that may have survived normalization
+	return stripBlockquotePrefix(m[0]);
+}
+
+/** Safe JSON parse with better error messages */
+function tryParseJsonFrom(normalized: string): {
+	json?: any;
+	error?: string;
+} {
+	const m = JSON_INLINE_RE.exec(normalized);
+	if (!m) return { error: "Missing OZRP-ANNO-JSON" };
+	const candidate = m[1];
+	try {
+		return { json: JSON.parse(candidate) };
+	} catch (e: any) {
+		console.warn("Error parsing annotation JSON:", e);
+		return { error: `Invalid JSON: ${e?.message || e}` };
+	}
+}
 
 export class AnnotationParser {
-	private static readonly CALLOUT_PATTERN = /^>\s*\[!info\]\s*\[\[([^|]+)\s*\|\s*([^,]+),\s*p\.(\d+)\]\]$/;
-	private static readonly ANNOTATION_PATTERN = /^>>\s*(.+)$/;
-	private static readonly COMMENT_PATTERN = /^>\s*(?!%)(.+)$/;
-	private static readonly METADATA_PATTERN = /^>\s*%%\s*(\{.*\})\s*$/;
-	private static readonly BLOCK_START_PATTERN = /^>\s*\[!info\]/;
+	/** Parses a file’s markdown content into structured annotations with ranges */
+	public static parseWithRanges(content: string): ParsedAnnotation[] {
+		const out: ParsedAnnotation[] = [];
 
-	/**
-	 * Parse a markdown file and extract all annotation blocks
-	 */
-	public static parseMarkdownFile(content: string): ParsedAnnotationBlock[] {
-		const lines = content.split('\n');
-		const blocks: ParsedAnnotationBlock[] = [];
-		let currentBlock: Partial<ParsedAnnotationBlock> | null = null;
-		let blockStartLine = -1;
-		let inBlock = false;
+		// Multi-pass: we first find each section body by matching BEGIN..(lookahead) END,
+		// then seek the END line to include it in the raw span.
+		let match: RegExpExecArray | null;
+		while ((match = SECTION_WITH_MARKERS_RE.exec(content)) !== null) {
+			const beginLineWithNL = match[1] || ""; // included to compute raw span
+			const bodyRaw = match[2] || "";
+			const bodyStart = match.index + beginLineWithNL.length;
 
-		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i];
+			// Find the END line that follows this match
+			SECTION_END_LINE_RE.lastIndex = bodyStart + bodyRaw.length;
+			const endLineMatch = SECTION_END_LINE_RE.exec(content);
+			if (!endLineMatch) continue; // malformed – skip
 
-			// Check if this is the start of a new annotation block
-			if (this.BLOCK_START_PATTERN.test(line)) {
-				// If we were already in a block, finalize it
-				if (currentBlock && inBlock) {
-					this.finalizeBlock(currentBlock, i - 1, blocks);
-				}
+			const rawStart = match.index;
+			const rawEnd = endLineMatch.index + endLineMatch[0].length; // inclusive of END line
+			const raw = content.slice(rawStart, rawEnd);
 
-				// Start new block
-				const calloutMatch = line.match(this.CALLOUT_PATTERN);
-				if (calloutMatch) {
-					currentBlock = {
-						zoteroLink: calloutMatch[1],
-						title: calloutMatch[2].trim(),
-						pageNumber: calloutMatch[3],
-						annotationText: '',
-						comments: '',
-						rawText: line + '\n',
-						startLine: i
-					};
-					blockStartLine = i;
-					inBlock = true;
-				}
+			// Normalize to remove ">"/spaces so inner markers are visible
+			const normalized = normalizeSectionBody(bodyRaw);
+
+			// Extract parts
+			const header = extractHeader(normalized);
+
+			const qm = QUOTE_BLOCK_RE.exec(normalized);
+			const cm = COMM_BLOCK_RE.exec(normalized);
+			const { json, error: jsonErr } = tryParseJsonFrom(normalized);
+
+			// Reset lastIndex for safety (these are not /g, but future-proof)
+			// N/A here – but keep note if toggled later
+
+			if (!qm || !cm || !json) {
+				// Skip but keep going; robust parser should not bail entire loop
+				// You can also push a diagnostic object here if desired
 				continue;
 			}
 
-			// If we're not in a block, skip
-			if (!inBlock || !currentBlock) {
-				continue;
-			}
+			const text = stripBlockquotePrefix(qm[1] || "");
+			const comment = stripBlockquotePrefix(cm[1] || "");
+			const id = computeAnnotationId(json, text, comment);
 
-			// Add line to raw text
-			currentBlock.rawText += line + '\n';
-
-			// Parse annotation text (>>)
-			const annotationMatch = line.match(this.ANNOTATION_PATTERN);
-			if (annotationMatch) {
-				if (currentBlock.annotationText) {
-					currentBlock.annotationText += '\n' + annotationMatch[1];
-				} else {
-					currentBlock.annotationText = annotationMatch[1];
-				}
-				continue;
-			}
-
-			// Parse metadata (%%)
-			const metadataMatch = line.match(this.METADATA_PATTERN);
-			if (metadataMatch) {
-				try {
-					const metadata = JSON.parse(metadataMatch[1]);
-					currentBlock.metadata = metadata;
-					currentBlock.id = metadata.id;
-				} catch (error) {
-					console.warn('Failed to parse metadata JSON:', error);
-				}
-				continue;
-			}
-
-			// Parse comments (> but not >> or %%)
-			const commentMatch = line.match(this.COMMENT_PATTERN);
-			if (commentMatch) {
-				if (currentBlock.comments) {
-					currentBlock.comments += '\n' + commentMatch[1];
-				} else {
-					currentBlock.comments = commentMatch[1];
-				}
-				continue;
-			}
-
-			// Empty quote line or end of block
-			if (line.trim() === '>' || line.trim() === '') {
-				// Continue adding to raw text but don't process
-				continue;
-			}
-
-			// If we hit a non-quote line, the block has ended
-			if (!line.startsWith('>')) {
-				this.finalizeBlock(currentBlock, i - 1, blocks);
-				currentBlock = null;
-				inBlock = false;
-			}
-		}
-
-		// Finalize the last block if it exists
-		if (currentBlock && inBlock) {
-			this.finalizeBlock(currentBlock, lines.length - 1, blocks);
-		}
-
-		return blocks;
-	}
-
-	/**
-	 * Find an annotation block by its ID
-	 */
-	public static findAnnotationById(content: string, id: string): ParsedAnnotationBlock | null {
-		const blocks = this.parseMarkdownFile(content);
-		return blocks.find(block => block.id === id) || null;
-	}
-
-	/**
-	 * Extract all annotation IDs from a markdown file
-	 */
-	public static extractAnnotationIds(content: string): string[] {
-		const blocks = this.parseMarkdownFile(content);
-		return blocks.map(block => block.id).filter(id => id);
-	}
-
-	/**
-	 * Replace an existing annotation block with new content
-	 */
-	public static replaceAnnotation(content: string, id: string, newAnnotation: Partial<ParsedAnnotationBlock>): string {
-		const lines = content.split('\n');
-		const existingBlock = this.findAnnotationById(content, id);
-		
-		if (!existingBlock) {
-			throw new Error(`Annotation with ID ${id} not found`);
-		}
-
-		// Create the new block content
-		const newBlockContent = this.createAnnotationBlock({
-			...existingBlock,
-			...newAnnotation
-		});
-
-		// Replace the lines
-		const newLines = [
-			...lines.slice(0, existingBlock.startLine),
-			...newBlockContent.split('\n').filter(line => line !== ''),
-			...lines.slice(existingBlock.endLine + 1)
-		];
-
-		return newLines.join('\n');
-	}
-
-	/**
-	 * Insert a new annotation block at the end of the file
-	 */
-	public static insertAnnotationAtEnd(content: string, annotation: Partial<ParsedAnnotationBlock>): string {
-		const blockContent = this.createAnnotationBlock(annotation);
-		const separator = content.endsWith('\n') ? '\n' : '\n\n';
-		return content + separator + blockContent;
-	}
-
-	/**
-	 * Remove an annotation block by ID
-	 */
-	public static removeAnnotation(content: string, id: string): string {
-		const lines = content.split('\n');
-		const existingBlock = this.findAnnotationById(content, id);
-		
-		if (!existingBlock) {
-			throw new Error(`Annotation with ID ${id} not found`);
-		}
-
-		// Remove the lines and any trailing empty lines
-		let endLine = existingBlock.endLine;
-		while (endLine + 1 < lines.length && lines[endLine + 1].trim() === '') {
-			endLine++;
-		}
-
-		const newLines = [
-			...lines.slice(0, existingBlock.startLine),
-			...lines.slice(endLine + 1)
-		];
-
-		return newLines.join('\n');
-	}
-
-	/**
-	 * Update the metadata of an existing annotation
-	 */
-	public static updateAnnotationMetadata(content: string, id: string, newMetadata: Partial<ZoteroAnnotation>): string {
-		const existingBlock = this.findAnnotationById(content, id);
-		
-		if (!existingBlock) {
-			throw new Error(`Annotation with ID ${id} not found`);
-		}
-
-		const updatedMetadata = {
-			...existingBlock.metadata,
-			...newMetadata,
-			dateModified: new Date().toISOString()
-		};
-
-		return this.replaceAnnotation(content, id, {
-			metadata: updatedMetadata
-		});
-	}
-
-	/**
-	 * Create annotation block text from a ParsedAnnotationBlock object
-	 */
-	public static createAnnotationBlock(annotation: Partial<ParsedAnnotationBlock>): string {
-		const parts: string[] = [];
-
-		// Create the callout line
-		const zoteroLink = annotation.zoteroLink || 'zotero://unknown.pdf';
-		const title = annotation.title || 'Unknown Title';
-		const pageNumber = annotation.pageNumber || '0';
-		parts.push(`> [!info] [[${zoteroLink} | ${title}, p.${pageNumber}]]`);
-
-		// Add annotation text
-		if (annotation.annotationText) {
-			const annotationLines = annotation.annotationText.split('\n');
-			annotationLines.forEach(line => {
-				parts.push(`>> ${line}`);
+			out.push({
+				id,
+				header,
+				text,
+				comment,
+				json,
+				range: { start: rawStart, end: rawEnd },
+				raw,
 			});
 		}
 
-		// Add empty line
-		parts.push('>');
-
-		// Add comments
-		if (annotation.comments) {
-			const commentLines = annotation.comments.split('\n');
-			commentLines.forEach(line => {
-				parts.push(`> ${line}`);
-			});
-		}
-
-		// Add metadata
-		if (annotation.metadata) {
-			const metadataJson = JSON.stringify(annotation.metadata);
-			parts.push(`> %% ${metadataJson}`);
-		}
-
-		return parts.join('\n');
+		return out;
 	}
 
-	/**
-	 * Finalize a block and add it to the blocks array
-	 */
-	private static finalizeBlock(
-		currentBlock: Partial<ParsedAnnotationBlock>,
-		endLine: number,
-		blocks: ParsedAnnotationBlock[]
-	): void {
-		if (currentBlock.id && currentBlock.zoteroLink && currentBlock.title) {
-			blocks.push({
-				id: currentBlock.id,
-				zoteroLink: currentBlock.zoteroLink,
-				title: currentBlock.title,
-				pageNumber: currentBlock.pageNumber || '0',
-				annotationText: currentBlock.annotationText || '',
-				comments: currentBlock.comments || '',
-				metadata: currentBlock.metadata!,
-				rawText: currentBlock.rawText || '',
-				startLine: currentBlock.startLine || 0,
-				endLine: endLine
-			});
+	public static async validateFileAnnotations(content: string): Promise<
+		Array<{
+			id?: string;
+			range: { start: number; end: number };
+			problem: string;
+			hint?: string;
+		}>
+	> {
+		const issues: Array<{
+			id?: string;
+			range: { start: number; end: number };
+			problem: string;
+			hint?: string;
+		}> = [];
+
+		let match: RegExpExecArray | null;
+		SECTION_WITH_MARKERS_RE.lastIndex = 0;
+
+		while ((match = SECTION_WITH_MARKERS_RE.exec(content)) !== null) {
+			const beginLineWithNL = match[1] || "";
+			const bodyRaw = match[2] || "";
+			const bodyStart = match.index + beginLineWithNL.length;
+
+			SECTION_END_LINE_RE.lastIndex = bodyStart + bodyRaw.length;
+			const endLineMatch = SECTION_END_LINE_RE.exec(content);
+			if (!endLineMatch) {
+				issues.push({
+					range: {
+						start: match.index,
+						end: match.index + (match[0]?.length ?? 0),
+					},
+					problem: "Missing END marker",
+					hint: `Ensure a line exactly like: ${OzrpAnnoMarks.END}`,
+				});
+				continue;
+			}
+
+			const rawStart = match.index;
+			const rawEnd = endLineMatch.index + endLineMatch[0].length;
+			const bodyNorm = normalizeSectionBody(bodyRaw);
+
+			const qm = QUOTE_BLOCK_RE.exec(bodyNorm);
+			const cm = COMM_BLOCK_RE.exec(bodyNorm);
+			const { json, error } = tryParseJsonFrom(bodyNorm);
+
+			const id =
+				qm && cm && json
+					? computeAnnotationId(
+							json,
+							stripBlockquotePrefix(qm[1] || ""),
+							stripBlockquotePrefix(cm[1] || "")
+					  )
+					: undefined;
+
+			if (!qm) {
+				issues.push({
+					range: { start: rawStart, end: rawEnd },
+					problem: "Missing quote block",
+					hint: `${OzrpAnnoMarks.Q_BEGIN} … ${OzrpAnnoMarks.Q_END}`,
+				});
+			}
+			if (!cm) {
+				issues.push({
+					range: { start: rawStart, end: rawEnd },
+					problem: "Missing comment block",
+					hint: `${OzrpAnnoMarks.C_BEGIN} … ${OzrpAnnoMarks.C_END}`,
+				});
+			}
+			if (error) {
+				issues.push({
+					range: { start: rawStart, end: rawEnd },
+					problem: error,
+					hint: `${OzrpAnnoMarks.J_INLINE_BEGIN} { … } ${OzrpAnnoMarks.J_INLINE_END}`,
+				});
+			}
 		}
-	}
 
-	/**
-	 * Validate if a string contains valid annotation blocks
-	 */
-	public static validateAnnotationBlocks(content: string): { isValid: boolean; errors: string[] } {
-		const errors: string[] = [];
-		const blocks = this.parseMarkdownFile(content);
-
-		for (const block of blocks) {
-			if (!block.id) {
-				errors.push(`Block at line ${block.startLine} is missing an ID`);
-			}
-			
-			if (!block.metadata) {
-				errors.push(`Block at line ${block.startLine} is missing metadata`);
-			}
-			
-			if (!block.zoteroLink || !block.zoteroLink.startsWith('zotero://')) {
-				errors.push(`Block at line ${block.startLine} has invalid Zotero link`);
-			}
-		}
-
-		return {
-			isValid: errors.length === 0,
-			errors
-		};
+		return issues;
 	}
 }
