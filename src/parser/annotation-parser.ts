@@ -13,34 +13,6 @@ export const OzrpAnnoMarks = {
 } as const;
 
 /**
- * FNV-1a 32-bit hash → hex string (deterministic, small, fast)
- */
-function fnv1aHex(input: string): string {
-	let h = 0x811c9dc5 >>> 0;
-	for (let i = 0; i < input.length; i++) {
-		h ^= input.charCodeAt(i);
-		// 32-bit FNV prime: 16777619
-		h = Math.imul(h, 0x01000193) >>> 0;
-	}
-	return ("00000000" + h.toString(16)).slice(-8);
-}
-
-/**
- * Try to derive a stable id from the JSON; fallback to hash of salient fields.
- */
-export function computeAnnotationId(
-	json: ZoteroAnnotation,
-	text: string,
-	comment: string
-): string {
-	const candidate = json.id;
-	if (typeof candidate === "string" && candidate.trim())
-		return candidate.trim();
-	const payload = JSON.stringify(json) + "\u241E" + text + "\u241E" + comment;
-	return fnv1aHex(payload);
-}
-
-/**
  * We match entire sections including markers, capturing the inner body for parsing.
  * Leading blockquote/space prefixes are tolerated and normalized out during parsing.
  */
@@ -117,8 +89,8 @@ function tryParseJsonFrom(normalized: string): {
 
 export class AnnotationParser {
 	/** Parses a file’s markdown content into structured annotations with ranges */
-	public static parseWithRanges(content: string): ParsedAnnotation[] {
-		const out: ParsedAnnotation[] = [];
+	public static parseWithRanges(content: string): Map<string, ParsedAnnotation> {
+		const out: Map<string, ParsedAnnotation> = new Map();
 
 		// Multi-pass: we first find each section body by matching BEGIN..(lookahead) END,
 		// then seek the END line to include it in the raw span.
@@ -158,9 +130,9 @@ export class AnnotationParser {
 
 			const text = stripBlockquotePrefix(qm[1] || "");
 			const comment = stripBlockquotePrefix(cm[1] || "");
-			const id = computeAnnotationId(json, text, comment);
+			const id = json.id;
 
-			out.push({
+			out.set(id, {
 				id,
 				header,
 				text,
@@ -218,15 +190,6 @@ export class AnnotationParser {
 			const qm = QUOTE_BLOCK_RE.exec(bodyNorm);
 			const cm = COMM_BLOCK_RE.exec(bodyNorm);
 			const { json, error } = tryParseJsonFrom(bodyNorm);
-
-			const id =
-				qm && cm && json
-					? computeAnnotationId(
-							json,
-							stripBlockquotePrefix(qm[1] || ""),
-							stripBlockquotePrefix(cm[1] || "")
-					  )
-					: undefined;
 
 			if (!qm) {
 				issues.push({

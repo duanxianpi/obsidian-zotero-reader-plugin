@@ -1,4 +1,3 @@
-
 export type ColorScheme = "light" | "dark";
 
 export interface CreateReaderOptions {
@@ -14,7 +13,7 @@ export type ChildEvents =
 	| { type: "error"; code: string; message: string }
 	| { type: "addToNote" }
 	| { type: "annotationsSaved"; annotations: ZoteroAnnotation[] }
-	| { type: "annotationsDeleted"; ids: string }
+	| { type: "annotationsDeleted"; ids: string[] }
 	| { type: "viewStateChanged"; state: unknown; primary: boolean }
 	| {
 			type: "openTagsPopup";

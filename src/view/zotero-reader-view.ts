@@ -25,14 +25,14 @@ interface ReaderViewState extends Record<string, unknown> {
 
 export class ZoteroReaderView extends ItemView {
 	private TOGGLE_MARKDOWN_CONTAINER_ID = "toggle-markdown-icon";
-	
+
 	private file: TFile | null;
 	private fileFrontmatter?: Record<string, unknown>;
 
 	private bridge?: IframeReaderBridge;
 	private colorSchemeObserver?: MutationObserver;
+	private annotationManager?: AnnotationManager;
 	private colorScheme: ColorScheme;
-	private annotationManager: AnnotationManager;
 
 	// State properties
 	private state: ReaderViewState;
@@ -43,12 +43,6 @@ export class ZoteroReaderView extends ItemView {
 			(getComputedStyle(document.body).colorScheme as ColorScheme) ??
 			"dark";
 		this.icon = "zotero-icon";
-		
-		// Initialize annotation manager
-		this.annotationManager = new AnnotationManager(
-			this.app.vault,
-			this.app.metadataCache
-		);
 	}
 
 	async setState(
@@ -64,9 +58,19 @@ export class ZoteroReaderView extends ItemView {
 			return;
 		}
 
-		this.fileFrontmatter = this.app.metadataCache.getFileCache(
-			this.file
-		)?.frontmatter as Record<string, unknown> | undefined;
+		this.fileFrontmatter = this.app.metadataCache.getFileCache(this.file)
+			?.frontmatter as Record<string, unknown> | undefined;
+
+		// Get file content
+		const content = await this.app.vault.read(this.file);
+
+		// Initialize annotation manager
+		this.annotationManager = new AnnotationManager(
+			this.app.vault,
+			this.app.metadataCache,
+			this.file,
+			content
+		);
 
 		// Reload view
 		this.renderReader();
@@ -150,6 +154,12 @@ export class ZoteroReaderView extends ItemView {
 
 			this.bridge.onEventType("annotationsSaved", (evt) => {
 				console.log("Annotations saved:", evt.annotations);
+				this.handleAnnotationsSaved(evt.annotations);
+			});
+
+			this.bridge.onEventType("annotationsDeleted", (evt) => {
+				console.log("Annotations deleted:", evt.ids);
+				this.handleAnnotationsDeleted(evt.ids);
 			});
 
 			this.bridge.onEventType("viewStateChanged", (evt) => {
@@ -214,9 +224,9 @@ export class ZoteroReaderView extends ItemView {
 		// Parse annotations from the current markdown file
 		const annotations = await this.parseAnnotationsFromFile();
 
-		const opts = { 
+		const opts = {
 			colorScheme: this.colorScheme,
-			annotations: annotations
+			annotations: annotations,
 		};
 
 		switch (sourceType) {
@@ -251,20 +261,63 @@ export class ZoteroReaderView extends ItemView {
 	 * Parse annotations from the current markdown file
 	 */
 	private async parseAnnotationsFromFile(): Promise<ZoteroAnnotation[]> {
-		if (!this.file) {
+		if (!this.annotationManager) {
 			return [];
 		}
 
 		try {
-			const parsedAnnotations = await this.annotationManager.getParsedAnnotations(this.file);
+			console.log(
+				"Parsing annotations from file:",
+				this.annotationManager
+			);
 
-			const annotations = parsedAnnotations.map((a) => ({...a.json, text: a.text, comment: a.comment}));
+			const annotations = [];
+
+			for (const [key, value] of this.annotationManager.annotationMap) {
+				annotations.push({
+					...value.json,
+					text: value.text,
+					comment: value.comment,
+				});
+			}
 
 			// Extract ZoteroAnnotation
 			return annotations;
 		} catch (error) {
 			console.error("Error parsing annotations from file:", error);
 			return [];
+		}
+	}
+
+	private async handleAnnotationsSaved(annotations: ZoteroAnnotation[]) {
+		if (!this.annotationManager) return;
+
+		const [update, create] = annotations.reduce(
+			([pass, fail], item) =>
+				this.annotationManager!.annotationMap.has(item.id)
+					? [[...pass, item], fail]
+					: [pass, [...fail, item]],
+			[[], []]
+		);
+
+		for (const annotation of create) {
+			await this.annotationManager.addAnnotation({
+				json: annotation,
+			});
+		}
+
+		for (const annotation of update) {
+			await this.annotationManager.updateAnnotation(annotation.id, {
+				json: annotation,
+			});
+		}
+	}
+
+	private async handleAnnotationsDeleted(annotationIds: string[]) {
+		if (!this.annotationManager) return;
+
+		for (const id of annotationIds) {
+			await this.annotationManager.removeAnnotation(id);
 		}
 	}
 

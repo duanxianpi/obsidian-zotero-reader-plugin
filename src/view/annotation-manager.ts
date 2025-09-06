@@ -7,25 +7,15 @@
  */
 
 import { TFile, Vault, MetadataCache } from "obsidian";
-import {
-	AnnotationParser,
-	computeAnnotationId,
-	OzrpAnnoMarks,
-} from "../parser/annotation-parser";
+import { AnnotationParser, OzrpAnnoMarks } from "../parser/annotation-parser";
 import { ParsedAnnotation, ZoteroAnnotation } from "../types/zotero-reader";
 
 export interface AnnotationInsertOptions {
 	insertAt?: "beginning" | "end" | "after-frontmatter"; // default: end
-	addTimestamp?: boolean; // append timestamp to comment block
-	tagPrefix?: string; // e.g. "#zotero/anno"
-	header?: string; // optional header/callout line content WITHOUT leading ">" (we add quoting)
 }
 
 export interface AnnotationUpdatePatch {
-	text?: string;
-	comment?: string;
 	json?: ZoteroAnnotation;
-	header?: string | null; // set to null to remove header, string to set, omit to keep
 }
 
 /** Tools */
@@ -33,94 +23,81 @@ const NL = "\n";
 const ensureTrailingNL = (s: string) => (s.endsWith("\n") ? s : s + "\n");
 
 export class AnnotationManager {
+	private file: TFile;
 	private vault: Vault;
 	private metadataCache: MetadataCache;
 
-	constructor(vault: Vault, metadataCache: MetadataCache) {
+	private _annotationMap: Map<string, ParsedAnnotation>;
+	public get annotationMap(): Map<string, ParsedAnnotation> {
+		return this._annotationMap;
+	}
+	constructor(
+		vault: Vault,
+		metadataCache: MetadataCache,
+		file: TFile,
+		content: string
+	) {
+		this.file = file;
 		this.vault = vault;
 		this.metadataCache = metadataCache;
-	}
 
-	/** Read + parse all annotations from a file (with ranges) */
-	async getParsedAnnotations(file: TFile): Promise<ParsedAnnotation[]> {
-		const content = await this.vault.read(file);
-		return AnnotationParser.parseWithRanges(content);
+		this._annotationMap = AnnotationParser.parseWithRanges(content);
 	}
 
 	/**
 	 * Insert a new annotation block into a file.
 	 * Returns the id of the new block.
 	 */
-	async addAnnotationToFile(
-		file: TFile,
-		data: { json: ZoteroAnnotation; text: string; comment: string },
+	async addAnnotation(
+		data: { json: ZoteroAnnotation },
 		options: AnnotationInsertOptions = {}
-	): Promise<string> {
-		const content = await this.vault.read(file);
+	): Promise<boolean> {
+		const content = await this.vault.read(this.file);
 
-		const id = computeAnnotationId(data.json, data.text, data.comment);
-
-		const section = this.buildAnnotationSection({
-			header: options.header,
-			text: data.text,
-			comment: data.comment,
-			json: data.json,
-			addTimestamp: options.addTimestamp,
-			tagPrefix: options.tagPrefix,
-		});
+		const section = this.buildAnnotationSection(data.json);
 
 		const updated = this.insertByStrategy(
 			content,
 			section,
 			options.insertAt ?? "end"
 		);
-		await this.vault.modify(file, updated);
-		return id;
+		await this.vault.modify(this.file, updated);
+		this._annotationMap = AnnotationParser.parseWithRanges(updated);
+
+		return true;
 	}
 
 	/** Update an existing annotation block by id */
-	async updateAnnotationInFile(
-		file: TFile,
+	async updateAnnotation(
 		id: string,
 		patch: AnnotationUpdatePatch
 	): Promise<boolean> {
-		const content = await this.vault.read(file);
-		const parsed = AnnotationParser.parseWithRanges(content);
-		const target = parsed.find((p) => p.id === id);
+		const content = await this.vault.read(this.file);
+		this._annotationMap = AnnotationParser.parseWithRanges(content);
+		const target = this._annotationMap.get(id);
 		if (!target) return false;
 
-		// Build a new section using existing values merged with patch
-		const newHeader =
-			patch.header === undefined
-				? target.header
-				: patch.header || undefined;
-		const newText = patch.text ?? target.text;
-		const newComment = patch.comment ?? target.comment;
-		const newJson = patch.json
-			? { ...target.json, ...patch.json }
-			: target.json;
+		if (!patch.json) return false; // nothing to do
 
-		const replacement = this.buildAnnotationSection({
-			header: newHeader,
-			text: newText,
-			comment: newComment,
-			json: newJson,
-		});
+		const replacement = this.buildAnnotationSection(patch.json);
 
 		const updated =
 			content.slice(0, target.range.start) +
 			replacement +
 			content.slice(target.range.end);
 
-		await this.vault.modify(file, updated);
+		await this.vault.modify(this.file, updated);
+		this._annotationMap = AnnotationParser.parseWithRanges(content);
+
 		return true;
 	}
 
 	/** Remove an annotation block by id */
-	async removeAnnotationFromFile(file: TFile, id: string): Promise<boolean> {
-		const content = await this.vault.read(file);
-		const parsed = AnnotationParser.parseWithRanges(content);
-		const target = parsed.find((p) => p.id === id);
+	async removeAnnotation(id: string): Promise<boolean> {
+		const content = await this.vault.read(this.file);
+		this._annotationMap = AnnotationParser.parseWithRanges(content);
+
+		const target = this.annotationMap.get(id);
 		if (!target) return false;
 
 		const before = content.slice(0, target.range.start);
@@ -134,12 +111,16 @@ export class AnnotationManager {
 			m.includes("\n") ? "\n" : ""
 		);
 
-		await this.vault.modify(file, beforeClean + afterClean);
+		await this.vault.modify(this.file, beforeClean + afterClean);
+		this._annotationMap = AnnotationParser.parseWithRanges(
+			beforeClean + afterClean
+		);
+
 		return true;
 	}
 
 	/** Validate all annotation blocks and return issues */
-	async validateFileAnnotations(file: TFile): Promise<
+	async validateFileAnnotations(): Promise<
 		Array<{
 			id?: string;
 			range: { start: number; end: number };
@@ -147,7 +128,7 @@ export class AnnotationManager {
 			hint?: string;
 		}>
 	> {
-		const content = await this.vault.read(file);
+		const content = await this.vault.read(this.file);
 		return AnnotationParser.validateFileAnnotations(content);
 	}
 
@@ -160,47 +141,46 @@ export class AnnotationManager {
 			.join("\n");
 	}
 
+	/** Add "> " prefix to each non-empty line.
+	 *  For quote blocks, use "> > " for the first line.
+	 */
+	private asQuoteBlockquote(text: string): string {
+		return text
+			.replace(/\s+$/, "")
+			.split(/\r?\n/)
+			.map((l, idx) =>
+				l.length ? (idx === 0 ? "> > " : "> ") + l : "> >"
+			)
+			.join("\n");
+	}
+
 	/** Build a canonical annotation section string (BEGIN..END) */
-	private buildAnnotationSection(opts: {
-		header?: string | null;
-		text: string;
-		comment: string;
-		json: Record<string, any>;
-		addTimestamp?: boolean;
-		tagPrefix?: string;
-	}): string {
+	private buildAnnotationSection(json: ZoteroAnnotation): string {
 		const pieces: string[] = [];
 		pieces.push(OzrpAnnoMarks.BEGIN);
 
-		if (opts.header && opts.header.trim()) {
-			pieces.push(this.asBlockquote(opts.header.trim()));
-			pieces.push("> ");
-		}
+		// if (header && header.trim()) {
+		// 	pieces.push(this.asBlockquote(header.trim()));
+		// 	pieces.push("> ");
+		// }
 
 		// Quote
 		pieces.push("> " + OzrpAnnoMarks.Q_BEGIN);
-		const q = ensureTrailingNL(opts.text || "");
-		pieces.push(this.asBlockquote(q));
+		const q = ensureTrailingNL(json.text || "");
+		pieces.push(this.asQuoteBlockquote(q));
 		pieces.push("> " + OzrpAnnoMarks.Q_END);
 		pieces.push("> ");
 
 		// Comment (optional but we always include the block for stability)
 		pieces.push("> " + OzrpAnnoMarks.C_BEGIN);
-		let comment = opts.comment || "";
-		const tags = opts.tagPrefix ? ` ${opts.tagPrefix}` : "";
-		if (opts.addTimestamp) {
-			const iso = new Date().toISOString();
-			comment = comment ? `${comment}\n@${iso}${tags}` : `@${iso}${tags}`;
-		} else if (tags) {
-			comment = comment ? `${comment}\n${tags}` : `${tags}`;
-		}
+		const comment = json.comment || "";
 		pieces.push(this.asBlockquote(ensureTrailingNL(comment)));
-		pieces.push("> " + OzrpAnnoMarks.C_END);
+		pieces.push("> " + OzrpAnnoMarks.C_END + ` ^${json.id}`);
 		pieces.push("");
 
 		// JSON inline
 		const jsonInline = `${OzrpAnnoMarks.J_INLINE_BEGIN} ${JSON.stringify(
-			opts.json
+			json
 		)} ${OzrpAnnoMarks.J_INLINE_END}`;
 		pieces.push(jsonInline);
 
