@@ -17,6 +17,7 @@ import {
 	addIcon,
 	MarkdownRenderer,
 	Component,
+	ObsidianProtocolData,
 } from "obsidian";
 
 import {
@@ -80,6 +81,20 @@ export default class ZoteroReaderPlugin extends Plugin {
 
 		// Add custom icons
 		addIcon(
+			"zotero-underline",
+			`
+			<path style="scale: 5;" fill-rule="evenodd" clip-rule="evenodd" d="M16 16L11 4H9L4 16H6.16667L7.41667 13H12.5833L13.8333 16H16ZM10 6.8L8.04167 11.5H11.9583L10 6.8ZM2 17H3H17H18V17.25V18V18.25H17H3H2V18V17.25V17Z" fill="currentColor"/>
+			`
+		);
+
+		addIcon(
+			"zotero-highlight",
+			`<path style="scale: 5;" fill-rule="evenodd" clip-rule="evenodd" d="M3 3H17V17H3V3ZM1.75 1.75H3H17H18.25V3V17V18.25H17H3H1.75V17V3V1.75ZM16 16L11 4H9L4 16H6.16667L7.41667 13H12.5833L13.8333 16H16ZM10 6.8L8.04167 11.5H11.9583L10 6.8Z" fill="currentColor"/>`
+		);
+
+		addIcon("zotero-note", `<path style="scale: 5;" d="M9.375 17.625H17.625V2.375H2.375V10.625M9.375 17.625L2.375 10.625M9.375 17.625V10.625H2.375" stroke="currentColor" stroke-width="1.25" fill="transparent"/>`);
+		addIcon("zotero-text", `<path style="scale: 5;" fill-rule="evenodd" clip-rule="evenodd" d="M9 2H4V4H9V17H11V4H16V2H11H9Z" fill="currentColor"/>`);
+		addIcon(
 			"zotero-icon",
 			`
 			<path
@@ -112,7 +127,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 
 		// Register the event for reader icon display
 		this.registerEvent(
-			this.app.workspace.on("file-open", () => {
+			this.app.workspace.on("active-leaf-change", () => {
 				this.initHeaderToggleButton();
 			})
 		);
@@ -126,6 +141,13 @@ export default class ZoteroReaderPlugin extends Plugin {
 		);
 
 		this.initHeaderToggleButton();
+
+		// Register protocol handler for zotero-reader URIs
+		// Usage: obsidian://zotero-reader?filePath=path/to/file.md
+		this.registerObsidianProtocolHandler(
+			"zotero-reader",
+			this.handleProtocolCall.bind(this)
+		);
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
@@ -145,7 +167,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 	}
 
 	private getActiveFile(): TFile | null {
-		const view = this.app.workspace.getActiveViewOfType(FileView);
+		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 		return view?.file ?? null;
 	}
 
@@ -233,8 +255,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 				type: READER_VIEW_TYPE,
 				state: {
 					sourceFilePath: file.path,
-					previousViewState: activeView.getState(),
-					previousViewType: activeView.getViewType(),
+					sourceViewState: activeView.getState(),
 				},
 				active: true,
 			});
@@ -251,6 +272,107 @@ export default class ZoteroReaderPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	/**
+	 * Handle protocol calls for zotero-reader
+	 * Expected URL format: obsidian://zotero-reader?filePath=path/to/file.md&sourceViewState=encoded_state
+	 */
+	private async handleProtocolCall(
+		params: ObsidianProtocolData
+	): Promise<void> {
+		try {
+			const { file, annotation } = params;
+
+			if (!file) {
+				new Notice(
+					"Missing filePath parameter in zotero-reader protocol call"
+				);
+				return;
+			}
+
+			// Check if the file exists
+			const tfile = this.app.vault.getFileByPath(file);
+			if (!tfile || !(tfile instanceof TFile)) {
+				new Notice(`File not found: ${file}`);
+				return;
+			}
+
+			// Check if a view with the same file path already exists
+			const existingLeaf = this.findExistingZoteroReaderLeaf(file);
+			if (existingLeaf) {
+				// Focus the existing view
+				this.app.workspace.setActiveLeaf(existingLeaf);
+				if (annotation) {
+					(
+						existingLeaf.view as ZoteroReaderView
+					).navigateToAnnotation(annotation);
+				}
+				return;
+			}
+
+			// Create a new view
+			await this.createZoteroReaderView(file, annotation);
+		} catch (error) {
+			console.error("Error handling zotero-reader protocol call:", error);
+			new Notice("Failed to open Zotero Reader view");
+		}
+	}
+
+	/**
+	 * Find an existing ZoteroReaderView leaf with the specified file path
+	 */
+	private findExistingZoteroReaderLeaf(
+		filePath: string
+	): WorkspaceLeaf | null {
+		const leaves = this.app.workspace.getLeavesOfType(READER_VIEW_TYPE);
+
+		for (const leaf of leaves) {
+			const view = leaf.view as ZoteroReaderView;
+			if (view && view.getState().sourceFilePath === filePath) {
+				return leaf;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Create a new ZoteroReaderView with the specified file path and state
+	 */
+	private async createZoteroReaderView(
+		filePath: string,
+		annotation: string
+	): Promise<void> {
+		// Create a new leaf (you can modify this to use existing leaf or create in specific location)
+		const leaf = this.app.workspace.getLeaf(true);
+
+		const readerOptions = { location: {} };
+		if (annotation) {
+			readerOptions.location = { annotationID: annotation };
+		}
+
+		await leaf.setViewState({
+			type: READER_VIEW_TYPE,
+			state: {
+				sourceFilePath: filePath,
+				sourceViewState: {
+					file: filePath,
+				},
+				readerOptions,
+			},
+			active: true,
+		});
+	}
+
+	/**
+	 * Generate a protocol URL for opening a ZoteroReaderView
+	 */
+	public generateZoteroReaderURL(filePath: string): string {
+		const params = new URLSearchParams();
+		params.set("file", filePath);
+
+		return `obsidian://zotero-reader?${params.toString()}`;
 	}
 }
 

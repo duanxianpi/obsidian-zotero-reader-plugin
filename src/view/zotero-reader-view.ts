@@ -19,8 +19,8 @@ export const VIEW_TYPE = "zotero-reader-view";
 
 interface ReaderViewState extends Record<string, unknown> {
 	sourceFilePath: string;
-	previousViewState: Record<string, unknown>;
-	previousViewType: string;
+	sourceViewState: Record<string, unknown>;
+	readerOptions: Partial<CreateReaderOptions>;
 }
 
 export class ZoteroReaderView extends ItemView {
@@ -80,12 +80,17 @@ export class ZoteroReaderView extends ItemView {
 		return this.state;
 	}
 
-	async renderReader() {
+	navigateToAnnotation(annotationId: string) {
+		if (!this.bridge) return;
+
+		this.bridge.navigateToAnnotation(annotationId);
+	}
+
+	private async renderReader() {
 		if (
 			!this.state ||
 			!this.state.sourceFilePath ||
-			!this.state.previousViewState ||
-			!this.state.previousViewType ||
+			!this.state.sourceViewState ||
 			!this.file
 		) {
 			return;
@@ -121,7 +126,7 @@ export class ZoteroReaderView extends ItemView {
 		}
 	}
 
-	async initializeReader() {
+	private async initializeReader() {
 		const container = this.containerEl.children[1] as HTMLElement;
 		// Create bridge once
 		if (!this.bridge) {
@@ -225,6 +230,7 @@ export class ZoteroReaderView extends ItemView {
 		const annotations = await this.parseAnnotationsFromFile();
 
 		const opts = {
+			...this.state.readerOptions,
 			colorScheme: this.colorScheme,
 			annotations: annotations,
 			sidebarOpen: false
@@ -370,8 +376,8 @@ export class ZoteroReaderView extends ItemView {
 		btn.onClick(async () => {
 			await this.bridge?.dispose();
 			await this.leaf.setViewState({
-				type: this.state.previousViewType,
-				state: this.state.previousViewState,
+				type: "markdown",
+				state: this.state.sourceViewState,
 				active: true,
 			});
 		});

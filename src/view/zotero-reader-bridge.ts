@@ -187,6 +187,12 @@ export class IframeReaderBridge {
 		});
 	}
 
+	navigateToAnnotation(annotationId: string) {
+		return this.enqueueOrRun(async () => {
+			await this.remote!.navigate({ annotationID: annotationId});
+		});
+	}
+
 	async dispose() {
 		if (!this.conn || this.state === "disposed") return;
 		this.editorList.forEach((editor) => editor.onunload());

@@ -18,6 +18,17 @@ export interface AnnotationUpdatePatch {
 	json?: ZoteroAnnotation;
 }
 
+const ANNOTATION_COLORS = new Map<string, string>([
+	['#ffd400', 'yellow'],
+	['#ff6666', 'red'],
+	['#5fb236', 'green'],
+	['#2ea8e5', 'blue'],
+	['#a28ae5', 'purple'],
+	['#e56eee', 'magenta'],
+	['#f19837', 'orange'],
+	['#aaaaaa', 'gray']
+]);
+
 /** Tools */
 const NL = "\n";
 const ensureTrailingNL = (s: string) => (s.endsWith("\n") ? s : s + "\n");
@@ -181,10 +192,18 @@ export class AnnotationManager {
 	}
 
 	/** Build a canonical annotation section string (BEGIN..END) */
-	private buildAnnotationSection(json: ZoteroAnnotation, isReplacementSection = false): string {
+	private buildAnnotationSection(
+		json: ZoteroAnnotation,
+		isReplacementSection = false
+	): string {
 		const pieces: string[] = [];
+
+		// Remove the text and comment inside json for serialization
 		pieces.push(
-			OzrpAnnoMarks.BEGIN.replace("{json}", JSON.stringify(json))
+			OzrpAnnoMarks.BEGIN.replace(
+				"{json}",
+				JSON.stringify({ ...json, text: "", comment: "" })
+			)
 		);
 
 		// if (header && header.trim()) {
@@ -192,7 +211,29 @@ export class AnnotationManager {
 		// 	pieces.push("> ");
 		// }
 
-		pieces.push(this.asBlockquote("[!Note] Annotation"));
+		const frontmatter = this.metadataCache.getFileCache(this.file)
+			?.frontmatter as Record<string, unknown> | undefined;
+
+		let sourceText = this.file.basename;
+		const source = (frontmatter?.["source"] as string).trim();
+		if (typeof source === "string") {
+			if (source.startsWith("http://") || source.startsWith("https://")) {
+				sourceText = source.split("/").pop() || source;
+			} else {
+				sourceText = source;
+			}
+		}
+
+		const pageLabel = json.pageLabel || "";
+		const displayText =
+			sourceText + (pageLabel ? `, page ${pageLabel}` : "");
+		const color = ANNOTATION_COLORS.get(json.color) || "yellow";
+
+		const header = `[!${json.type}-${color}] [${displayText}](obsidian://zotero-reader?file=${encodeURIComponent(
+			this.file.path
+		)}&annotation=${json.id})`;
+
+		pieces.push(this.asBlockquote(header));
 
 		// Quote
 		pieces.push("> " + OzrpAnnoMarks.Q_BEGIN);
@@ -204,7 +245,11 @@ export class AnnotationManager {
 		// Comment (optional but we always include the block for stability)
 		const comment = json.comment || "";
 		// pieces.push("> " + OzrpAnnoMarks.C_BEGIN);
-		pieces.push(this.asBlockquote(ensureTrailingNL(`${OzrpAnnoMarks.C_BEGIN} ${comment}`)));
+		pieces.push(
+			this.asBlockquote(
+				ensureTrailingNL(`${OzrpAnnoMarks.C_BEGIN} ${comment}`)
+			)
+		);
 		pieces.push("> " + OzrpAnnoMarks.C_END + ` ^${json.id}`);
 		pieces.push("");
 

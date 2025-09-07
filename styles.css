@@ -75,3 +75,51 @@
 	text-align: end;
 	padding-left: 5px;
 }
+
+.callout[data-callout$="yellow"] {
+	--callout-color: var(--color-yellow-rgb);
+}
+
+.callout[data-callout$="red"] {
+	--callout-color: var(--color-red-rgb);
+}
+
+.callout[data-callout$="green"] {
+	--callout-color: var(--color-green-rgb);
+}
+
+.callout[data-callout$="blue"] {
+	--callout-color: var(--color-blue-rgb);
+}
+
+.callout[data-callout$="purple"] {
+	--callout-color: var(--color-purple-rgb);
+}
+
+.callout[data-callout$="magenta"] {
+	--callout-color: var(--color-pink-rgb);
+}
+
+.callout[data-callout$="orange"] {
+	--callout-color: var(--color-orange-rgb);
+}
+
+.callout[data-callout$="gray"] {
+	--callout-color: var(--callout-quote);
+}
+
+.callout[data-callout^="highlight"] {
+	--callout-icon: zotero-highlight;
+}
+
+.callout[data-callout^="underline"] {
+	--callout-icon: zotero-underline;
+}
+
+.callout[data-callout^="text"] {
+	--callout-icon: zotero-text;
+}
+
+.callout[data-callout^="note"] {
+	--callout-icon: zotero-note;
+}
