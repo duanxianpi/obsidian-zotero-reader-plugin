@@ -188,10 +188,35 @@ export class EmbeddableMarkdownEditor {
 									if (self.options.onBlur) {
 										self.options.onBlur(self);
 									}
+									if (
+										document.querySelector(
+											"body > div.menu"
+										) !== null
+									) {
+										document.body.click();
+									}
 								},
 								focusin: () => {
 									app.keymap.pushScope(self.scope);
 									app.workspace.activeEditor = self.owner;
+								},
+								click: () => {
+									if (
+										document.querySelector(
+											"body > div.menu"
+										) !== null
+									) {
+										document.body.click();
+									}
+								},
+								contextmenu: () => {
+									if (
+										document.querySelector(
+											"body > div.menu"
+										) !== null
+									) {
+										document.body.click();
+									}
 								},
 							})
 						);
@@ -274,6 +299,8 @@ export class EmbeddableMarkdownEditor {
 
 		// Add obsidian-app class to the editor container, apply obsidian styles
 		container.classList.toggle("obsidian-app", true);
+		// Unset some unnecessary obsidian styles
+		container.style.contain = "content";
 
 		// Create the editor with the app instance
 		this.editor = new EditorClass(app, container, {
@@ -318,6 +345,9 @@ export class EmbeddableMarkdownEditor {
 		if (options.cls && this.editorEl) {
 			this.editorEl.classList.add(options.cls);
 		}
+
+		// Set the font-size to 1em
+		this.editorEl.style.fontSize = "1em";
 
 		// Set cursor position if specified
 		if (options.cursorLocation && this.editor.editor?.cm) {

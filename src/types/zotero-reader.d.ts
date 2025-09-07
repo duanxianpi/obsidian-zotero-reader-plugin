@@ -54,6 +54,7 @@ export type ParentApi = {
 		annotationId: string,
 		options: Partial<MarkdownEditorProps>
 	) => Promise<{ ok: true }>;
+
 };
 
 export type ChildApi = {

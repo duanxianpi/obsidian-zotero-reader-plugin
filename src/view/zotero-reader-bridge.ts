@@ -121,6 +121,11 @@ export class IframeReaderBridge {
 								comment: update.state.doc.toString(),
 							});
 						},
+						onBlur: (editor) => {
+							editor.activeCM.dispatch({
+								effects: EditorView.scrollIntoView(0, { y: "start" })
+							});
+						},
 					}
 				);
 				this.editorList.push(editor);

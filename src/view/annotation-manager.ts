@@ -79,7 +79,7 @@ export class AnnotationManager {
 
 		if (!patch.json) return false; // nothing to do
 
-		const replacement = this.buildAnnotationSection(patch.json);
+		const replacement = this.buildAnnotationSection(patch.json, true);
 
 		const updated =
 			content.slice(0, target.range.start) +
@@ -181,7 +181,7 @@ export class AnnotationManager {
 	}
 
 	/** Build a canonical annotation section string (BEGIN..END) */
-	private buildAnnotationSection(json: ZoteroAnnotation): string {
+	private buildAnnotationSection(json: ZoteroAnnotation, isReplacementSection = false): string {
 		const pieces: string[] = [];
 		pieces.push(
 			OzrpAnnoMarks.BEGIN.replace("{json}", JSON.stringify(json))
@@ -202,18 +202,16 @@ export class AnnotationManager {
 		pieces.push("> ");
 
 		// Comment (optional but we always include the block for stability)
-		pieces.push("> " + OzrpAnnoMarks.C_BEGIN);
 		const comment = json.comment || "";
-		pieces.push(this.asBlockquote(ensureTrailingNL(comment)));
+		// pieces.push("> " + OzrpAnnoMarks.C_BEGIN);
+		pieces.push(this.asBlockquote(ensureTrailingNL(`${OzrpAnnoMarks.C_BEGIN} ${comment}`)));
 		pieces.push("> " + OzrpAnnoMarks.C_END + ` ^${json.id}`);
 		pieces.push("");
 
-		// JSON inline
-		json.text = "";
-		json.comment = "";
 		pieces.push(OzrpAnnoMarks.END);
 
-		return pieces.join(NL) + NL; // always end with NL
+		// We only add new lines for non-replacement sections
+		return pieces.join(NL) + (isReplacementSection ? "" : NL);
 	}
 
 	/** Internal: choose insertion point strategy */

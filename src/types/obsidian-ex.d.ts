@@ -467,6 +467,8 @@ declare module "obsidian" {
 		 * Update the bottom padding of the CodeMirror contentdom.
 		 */
 		updateBottomPadding(height: number): void;
+
+		scrollIntoView(options?: ScrollIntoViewOptions): void;
 	}
 
 	export interface Fold {
