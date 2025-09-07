@@ -42,7 +42,6 @@ function resolveEditorPrototype(app: App): any {
 		""
 	) as WidgetEditorView;
 
-	console.log("Temporary editor created", widgetEditorView);
 	// Mark as editable to instantiate the editor
 	widgetEditorView.editable = true;
 	widgetEditorView.showEditor();
@@ -57,7 +56,7 @@ function resolveEditorPrototype(app: App): any {
 	return MarkdownEditor.constructor;
 }
 
-interface MarkdownEditorProps {
+export interface MarkdownEditorProps {
 	cursorLocation?: { anchor: number; head: number };
 	value?: string;
 	cls?: string;
@@ -159,7 +158,6 @@ export class EmbeddableMarkdownEditor {
 					})
 				);
 
-			console.log(self.editor);
 			return isSuggesting;
 		};
 
@@ -289,8 +287,6 @@ export class EmbeddableMarkdownEditor {
 		//@ts-ignore
 		window.parent.testEditor = this.editor;
 
-		console.log("Editor created", this.editor);
-
 		// Register the uninstaller for cleanup
 		this.register(uninstaller);
 
@@ -301,7 +297,6 @@ export class EmbeddableMarkdownEditor {
 		}
 
 		// Set initial content
-		console.log("Initial content set:", options.value || "");
 		this.set(options.value || "", false);
 
 		// Prevent active leaf changes while focused

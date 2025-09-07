@@ -1,3 +1,6 @@
+import { MarkdownEditorProps } from "src/editor/markdownEditor";
+import { ViewUpdate } from "@codemirror/view";
+
 export type ColorScheme = "light" | "dark";
 
 export interface CreateReaderOptions {
@@ -46,13 +49,18 @@ export type ChildEvents =
 export type ParentApi = {
 	// child → parent
 	handleEvent: (evt: ChildEvents) => void;
-	createEditor: (containerSelector: string) => Promise<{ ok: true }>;
+	createAnnotationEditor: (
+		containerSelector: string,
+		annotationId: string,
+		options: Partial<MarkdownEditorProps>
+	) => Promise<{ ok: true }>;
 };
 
 export type ChildApi = {
 	// parent → child
 	initReader: (opts: CreateReaderOptions) => Promise<{ ok: true }>;
 	setColorScheme: (colorScheme: ColorScheme) => Promise<{ ok: true }>;
+	updateAnnotation: (annotation: Partial<ZoteroAnnotation>) => Promise<{ ok: true }>;
 	destroy: () => Promise<{ ok: true }>;
 };
 

@@ -2,26 +2,35 @@ import { ParsedAnnotation, ZoteroAnnotation } from "../types/zotero-reader";
 
 /** Internal constants for the block markers */
 export const OzrpAnnoMarks = {
-	BEGIN: "%% OZRP-ANNO-BEGIN %%",
+	BEGIN: "%% OZRP-ANNO-BEGIN {json} %%",
 	END: "%% OZRP-ANNO-END %%",
 	Q_BEGIN: "%% OZRP-ANNO-QUOTE-BEGIN %%",
 	Q_END: "%% OZRP-ANNO-QUOTE-END %%",
 	C_BEGIN: "%% OZRP-ANNO-COMM-BEGIN %%",
 	C_END: "%% OZRP-ANNO-COMM-END %%",
-	J_INLINE_BEGIN: "%% OZRP-ANNO-JSON-BEGIN",
-	J_INLINE_END: "OZRP-ANNO-JSON-END %%",
 } as const;
 
 /**
  * We match entire sections including markers, capturing the inner body for parsing.
  * Leading blockquote/space prefixes are tolerated and normalized out during parsing.
  */
+// const SECTION_WITH_MARKERS_RE = new RegExp(
+// 	String.raw`(^[>\t ]*%%\s*OZRP-ANNO-BEGIN\s*%%[\t ]*(?:\r?\n))` + // group 1: begin line (with trailing NL)
+// 		String.raw`([\s\S]*?)` + // group 2: inner body (non-greedy)
+// 		String.raw`(?=^[>\t ]*%%\s*OZRP-ANNO-END\s*%%[\t ]*$)`, // lookahead up to END line
+// 	"gm"
+// );
+
 const SECTION_WITH_MARKERS_RE = new RegExp(
-	String.raw`(^[>\t ]*%%\s*OZRP-ANNO-BEGIN\s*%%[\t ]*(?:\r?\n))` + // group 1: begin line (with trailing NL)
-		String.raw`([\s\S]*?)` + // group 2: inner body (non-greedy)
+	String.raw`(^[>\t ]*%%\s*OZRP-ANNO-BEGIN\b` + // group 1: begin line (with trailing NL)
+		String.raw`[\t ]*` +
+		String.raw`(\{[\s\S]*?\})` + // group 2: grab the JSON object
+		String.raw`\s*%%[\t ]*(?:\r?\n))` +
+		String.raw`([\s\S]*?)` + // group 3: inner body (non-greedy)
 		String.raw`(?=^[>\t ]*%%\s*OZRP-ANNO-END\s*%%[\t ]*$)`, // lookahead up to END line
 	"gm"
 );
+
 const SECTION_END_LINE_RE = /^[>\t ]*%%\s*OZRP-ANNO-END\s*%%[\t ]*$/gm;
 
 // Inside a normalized section (no leading ">"), capture header + chunks
@@ -72,15 +81,12 @@ function extractHeader(normalized: string): string | undefined {
 }
 
 /** Safe JSON parse with better error messages */
-function tryParseJsonFrom(normalized: string): {
+function tryParseJsonFrom(jsonRaw: string): {
 	json?: any;
 	error?: string;
 } {
-	const m = JSON_INLINE_RE.exec(normalized);
-	if (!m) return { error: "Missing OZRP-ANNO-JSON" };
-	const candidate = m[1];
 	try {
-		return { json: JSON.parse(candidate) };
+		return { json: JSON.parse(jsonRaw) };
 	} catch (e: any) {
 		console.warn("Error parsing annotation JSON:", e);
 		return { error: `Invalid JSON: ${e?.message || e}` };
@@ -89,7 +95,9 @@ function tryParseJsonFrom(normalized: string): {
 
 export class AnnotationParser {
 	/** Parses a file’s markdown content into structured annotations with ranges */
-	public static parseWithRanges(content: string): Map<string, ParsedAnnotation> {
+	public static parseWithRanges(
+		content: string
+	): Map<string, ParsedAnnotation> {
 		const out: Map<string, ParsedAnnotation> = new Map();
 
 		// Multi-pass: we first find each section body by matching BEGIN..(lookahead) END,
@@ -97,7 +105,8 @@ export class AnnotationParser {
 		let match: RegExpExecArray | null;
 		while ((match = SECTION_WITH_MARKERS_RE.exec(content)) !== null) {
 			const beginLineWithNL = match[1] || ""; // included to compute raw span
-			const bodyRaw = match[2] || "";
+			const jsonRaw = match[2] || ""; // the JSON object
+			const bodyRaw = match[3] || "";
 			const bodyStart = match.index + beginLineWithNL.length;
 
 			// Find the END line that follows this match
@@ -117,7 +126,7 @@ export class AnnotationParser {
 
 			const qm = QUOTE_BLOCK_RE.exec(normalized);
 			const cm = COMM_BLOCK_RE.exec(normalized);
-			const { json, error: jsonErr } = tryParseJsonFrom(normalized);
+			const { json, error: jsonErr } = tryParseJsonFrom(jsonRaw);
 
 			// Reset lastIndex for safety (these are not /g, but future-proof)
 			// N/A here – but keep note if toggled later
@@ -166,7 +175,8 @@ export class AnnotationParser {
 
 		while ((match = SECTION_WITH_MARKERS_RE.exec(content)) !== null) {
 			const beginLineWithNL = match[1] || "";
-			const bodyRaw = match[2] || "";
+			const jsonRaw = match[2] || ""; // the JSON object
+			const bodyRaw = match[3] || "";
 			const bodyStart = match.index + beginLineWithNL.length;
 
 			SECTION_END_LINE_RE.lastIndex = bodyStart + bodyRaw.length;
@@ -189,7 +199,7 @@ export class AnnotationParser {
 
 			const qm = QUOTE_BLOCK_RE.exec(bodyNorm);
 			const cm = COMM_BLOCK_RE.exec(bodyNorm);
-			const { json, error } = tryParseJsonFrom(bodyNorm);
+			const { json, error } = tryParseJsonFrom(jsonRaw);
 
 			if (!qm) {
 				issues.push({
@@ -209,7 +219,7 @@ export class AnnotationParser {
 				issues.push({
 					range: { start: rawStart, end: rawEnd },
 					problem: error,
-					hint: `${OzrpAnnoMarks.J_INLINE_BEGIN} { … } ${OzrpAnnoMarks.J_INLINE_END}`,
+					hint: `${OzrpAnnoMarks.BEGIN} { … }`,
 				});
 			}
 		}

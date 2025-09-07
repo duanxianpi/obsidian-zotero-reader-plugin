@@ -227,6 +227,7 @@ export class ZoteroReaderView extends ItemView {
 		const opts = {
 			colorScheme: this.colorScheme,
 			annotations: annotations,
+			sidebarOpen: false
 		};
 
 		switch (sourceType) {

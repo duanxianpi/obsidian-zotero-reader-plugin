@@ -10,7 +10,7 @@ import { syntaxTree } from "@codemirror/language";
 
 export function ozrpAnnoCommentExtension(): Extension {
 	const annoPrefix = /.*OZRP-ANNO.*/i;
-	const annoJsonPrefix = /.*OZRP-ANNO-JSON-BEGIN.*/i;
+	const annoJsonPrefix = /.*OZRP-ANNO-BEGIN.*/i;
 	const commNodeStartName = /.*comment-start_formatting.*/i;
 	const commNodeEndName = /.*comment-end_formatting.*/i;
 

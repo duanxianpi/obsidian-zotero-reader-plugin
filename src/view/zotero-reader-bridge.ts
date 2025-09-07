@@ -6,8 +6,12 @@ import type {
 	ColorScheme,
 	ChildEvents,
 } from "../types/zotero-reader";
-import { createEmbeddableMarkdownEditor, EmbeddableMarkdownEditor } from "../editor/markdownEditor";
-import { Editor } from "obsidian";
+import {
+	createEmbeddableMarkdownEditor,
+	EmbeddableMarkdownEditor,
+	MarkdownEditorProps,
+} from "../editor/markdownEditor";
+import { EditorView, keymap, placeholder, ViewUpdate } from "@codemirror/view";
 
 type BridgeState = "idle" | "connecting" | "ready" | "disposing" | "disposed";
 
@@ -17,7 +21,10 @@ export class IframeReaderBridge {
 	private remote?: RemoteProxy<ChildApi>;
 	private state: BridgeState = "idle";
 	private queue: (() => Promise<void>)[] = [];
-	private typedListeners = new Map<ChildEvents["type"], Set<(e: ChildEvents) => void>>();
+	private typedListeners = new Map<
+		ChildEvents["type"],
+		Set<(e: ChildEvents) => void>
+	>();
 	private connectTimeoutMs = 8000;
 	private editorList: EmbeddableMarkdownEditor[] = [];
 
@@ -32,18 +39,18 @@ export class IframeReaderBridge {
 	 * @param eventType The specific event type to listen for
 	 * @param cb Callback function that receives only events of the specified type
 	 * @returns Unsubscribe function
-	 * 
+	 *
 	 * @example
 	 * // Listen only to error events
 	 * bridge.onEventType("error", (evt) => {
 	 *   console.error(`${evt.code}: ${evt.message}`);
 	 * });
-	 * 
+	 *
 	 * // Listen only to link opening events
 	 * bridge.onEventType("openLink", (evt) => {
 	 *   window.open(evt.url, '_blank');
 	 * });
-	 * 
+	 *
 	 * // Listen to sidebar toggle events
 	 * bridge.onEventType("sidebarToggled", (evt) => {
 	 *   console.log("Sidebar is now:", evt.open ? "open" : "closed");
@@ -86,29 +93,34 @@ export class IframeReaderBridge {
 
 		// Parent API exposed to child (event channel)
 		const parentApi: ParentApi = {
-			handleEvent: (evt) => {				
+			handleEvent: (evt) => {
 				// Notify typed listeners for this specific event type
 				const typedListeners = this.typedListeners.get(evt.type);
 				if (typedListeners) {
 					typedListeners.forEach((l) => l(evt));
 				}
 			},
-			createEditor: async (containerSelector: string) => {
+			createAnnotationEditor: async (
+				containerId: string,
+				annotationId: string,
+				options: Partial<MarkdownEditorProps>
+			) => {
 				const container =
-					this.iframe!.contentDocument!.querySelector(
-						containerSelector
-					);
+					this.iframe!.contentDocument!.getElementById(containerId);
 				if (!container) {
-					throw new Error(
-						`Container not found: ${containerSelector}`
-					);
+					throw new Error(`Container not found: ${containerId}`);
 				}
 				const editor = createEmbeddableMarkdownEditor(
 					(window as any).app,
 					container as HTMLElement,
 					{
-						value: "",
-						cls: "obsidian-app",
+						...options,
+						onChange: (update: ViewUpdate) => {
+							this.remote?.updateAnnotation({
+								id: annotationId,
+								comment: update.state.doc.toString(),
+							});
+						},
 					}
 				);
 				this.editorList.push(editor);
@@ -172,7 +184,7 @@ export class IframeReaderBridge {
 
 	async dispose() {
 		if (!this.conn || this.state === "disposed") return;
-		this.editorList.forEach(editor => editor.onunload());
+		this.editorList.forEach((editor) => editor.onunload());
 		this.state = "disposing";
 		this.conn!.destroy();
 		this.conn = undefined;

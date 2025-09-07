@@ -100,25 +100,51 @@ export class AnnotationManager {
 		const target = this.annotationMap.get(id);
 		if (!target) return false;
 
+		const NL = /\r\n/.test(content) ? "\r\n" : "\n";
+		// Set to 2 to leave one *blank line* between blocks
+		const MAX_NEWLINES_BETWEEN = 2;
+
 		const before = content.slice(0, target.range.start);
 		const after = content.slice(target.range.end);
 
-		// Clean up leading/trailing blank lines to avoid double gaps
-		const beforeClean = before.replace(/[\t ]*\n?[\t ]*$/, (m) =>
-			m.includes("\n") ? "\n" : ""
-		);
-		const afterClean = after.replace(/^[\t ]*\n?/, (m) =>
-			m.includes("\n") ? "\n" : ""
-		);
+		// Grab only *blank lines* at the join (whitespace + newline), not indentation before content.
+		const leftBlank = before.match(/(?:[ \t]*\r?\n[ \t]*)+$/)?.[0] ?? "";
+		const rightBlank = after.match(/^[ \t]*(?:\r?\n[ \t]*)+/)?.[0] ?? "";
 
-		await this.vault.modify(this.file, beforeClean + afterClean);
-		this._annotationMap = AnnotationParser.parseWithRanges(
-			beforeClean + afterClean
-		);
+		// Core text with boundary blanks stripped; also trim trailing spaces on the left side
+		const beforeCore = (
+			leftBlank
+				? before.slice(0, before.length - leftBlank.length)
+				: before
+		).replace(/[ \t]+$/g, "");
+		const afterCore = rightBlank ? after.slice(rightBlank.length) : after;
 
+		const hadBoundaryBreak = leftBlank.length > 0 || rightBlank.length > 0;
+
+		// Decide what to put between the cores
+		let join = "";
+		if (hadBoundaryBreak) {
+			join = NL.repeat(MAX_NEWLINES_BETWEEN);
+		} else {
+			// Inline deletion: avoid `Helloworld`
+			const leftChar = beforeCore.slice(-1);
+			const rightChar = afterCore.slice(0, 1);
+			if (
+				leftChar &&
+				rightChar &&
+				/\S/.test(leftChar) &&
+				/\S/.test(rightChar)
+			) {
+				join = " ";
+			}
+		}
+
+		const newContent = beforeCore + join + afterCore;
+
+		await this.vault.modify(this.file, newContent);
+		this._annotationMap = AnnotationParser.parseWithRanges(newContent);
 		return true;
 	}
-
 	/** Validate all annotation blocks and return issues */
 	async validateFileAnnotations(): Promise<
 		Array<{
@@ -157,12 +183,16 @@ export class AnnotationManager {
 	/** Build a canonical annotation section string (BEGIN..END) */
 	private buildAnnotationSection(json: ZoteroAnnotation): string {
 		const pieces: string[] = [];
-		pieces.push(OzrpAnnoMarks.BEGIN);
+		pieces.push(
+			OzrpAnnoMarks.BEGIN.replace("{json}", JSON.stringify(json))
+		);
 
 		// if (header && header.trim()) {
 		// 	pieces.push(this.asBlockquote(header.trim()));
 		// 	pieces.push("> ");
 		// }
+
+		pieces.push(this.asBlockquote("[!Note] Annotation"));
 
 		// Quote
 		pieces.push("> " + OzrpAnnoMarks.Q_BEGIN);
@@ -179,11 +209,8 @@ export class AnnotationManager {
 		pieces.push("");
 
 		// JSON inline
-		const jsonInline = `${OzrpAnnoMarks.J_INLINE_BEGIN} ${JSON.stringify(
-			json
-		)} ${OzrpAnnoMarks.J_INLINE_END}`;
-		pieces.push(jsonInline);
-
+		json.text = "";
+		json.comment = "";
 		pieces.push(OzrpAnnoMarks.END);
 
 		return pieces.join(NL) + NL; // always end with NL
@@ -209,8 +236,7 @@ export class AnnotationManager {
 				return this.insertAfterFrontmatter(content, section);
 			case "end":
 			default: {
-				const needsGap =
-					content.length > 0 && !content.endsWith("\n\n");
+				const needsGap = content.length > 0 && !content.endsWith("\n");
 				const sep =
 					content.length === 0 ? "" : needsGap ? "\n\n" : "\n";
 				return content + sep + section;
