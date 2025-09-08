@@ -281,7 +281,9 @@ export default class ZoteroReaderPlugin extends Plugin {
 		params: ObsidianProtocolData
 	): Promise<void> {
 		try {
-			const { file, annotation } = params;
+			const { file, navigation } = params;
+
+			const navigationInfo = JSON.parse(navigation);
 
 			if (!file) {
 				new Notice(
@@ -302,16 +304,16 @@ export default class ZoteroReaderPlugin extends Plugin {
 			if (existingLeaf) {
 				// Focus the existing view
 				this.app.workspace.setActiveLeaf(existingLeaf);
-				if (annotation) {
+				if (navigationInfo) {
 					(
 						existingLeaf.view as ZoteroReaderView
-					).navigateToAnnotation(annotation);
+					).readerNavigate(navigationInfo);
 				}
 				return;
 			}
 
 			// Create a new view
-			await this.createZoteroReaderView(file, annotation);
+			await this.createZoteroReaderView(file, navigationInfo);
 		} catch (error) {
 			console.error("Error handling zotero-reader protocol call:", error);
 			new Notice("Failed to open Zotero Reader view");
@@ -341,14 +343,14 @@ export default class ZoteroReaderPlugin extends Plugin {
 	 */
 	private async createZoteroReaderView(
 		filePath: string,
-		annotation: string
+		navigationInfo: any = null,
 	): Promise<void> {
 		// Create a new leaf (you can modify this to use existing leaf or create in specific location)
 		const leaf = this.app.workspace.getLeaf(true);
 
 		const readerOptions = { location: {} };
-		if (annotation) {
-			readerOptions.location = { annotationID: annotation };
+		if (navigationInfo) {
+			readerOptions.location = navigationInfo;
 		}
 
 		await leaf.setViewState({

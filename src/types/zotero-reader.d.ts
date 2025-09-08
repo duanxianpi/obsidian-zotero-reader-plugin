@@ -68,7 +68,7 @@ export type ChildApi = {
 	updateAnnotation: (
 		annotation: Partial<ZoteroAnnotation>
 	) => Promise<{ ok: true }>;
-	navigate: (location: { annotationID: string }) => Promise<{ ok: true }>;
+	navigate: (navigationInfo: any) => Promise<{ ok: true }>;
 	destroy: () => Promise<{ ok: true }>;
 };
 

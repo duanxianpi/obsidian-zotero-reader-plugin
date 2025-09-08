@@ -84,10 +84,10 @@ export class ZoteroReaderView extends ItemView {
 		return this.state;
 	}
 
-	navigateToAnnotation(annotationId: string) {
+	readerNavigate(navigationInfo: any) {
 		if (!this.bridge) return;
 
-		this.bridge.navigateToAnnotation(annotationId);
+		this.bridge.navigate(navigationInfo);
 	}
 
 	private async renderReader() {

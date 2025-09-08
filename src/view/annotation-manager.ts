@@ -19,14 +19,14 @@ export interface AnnotationUpdatePatch {
 }
 
 const ANNOTATION_COLORS = new Map<string, string>([
-	['#ffd400', 'yellow'],
-	['#ff6666', 'red'],
-	['#5fb236', 'green'],
-	['#2ea8e5', 'blue'],
-	['#a28ae5', 'purple'],
-	['#e56eee', 'magenta'],
-	['#f19837', 'orange'],
-	['#aaaaaa', 'gray']
+	["#ffd400", "yellow"],
+	["#ff6666", "red"],
+	["#5fb236", "green"],
+	["#2ea8e5", "blue"],
+	["#a28ae5", "purple"],
+	["#e56eee", "magenta"],
+	["#f19837", "orange"],
+	["#aaaaaa", "gray"],
 ]);
 
 /** Tools */
@@ -229,9 +229,14 @@ export class AnnotationManager {
 			sourceText + (pageLabel ? `, page ${pageLabel}` : "");
 		const color = ANNOTATION_COLORS.get(json.color) || "yellow";
 
-		const header = `[!ozrp-${json.type}-${color}] [${displayText}](obsidian://zotero-reader?file=${encodeURIComponent(
+		const navLink = encodeURIComponent(
+			JSON.stringify({ annotationID: json.id })
+		);
+		const header = `[!ozrp-${
+			json.type
+		}-${color}] [${displayText}](obsidian://zotero-reader?file=${encodeURIComponent(
 			this.file.path
-		)}&annotation=${json.id})`;
+		)}&navigation=${navLink})`;
 
 		pieces.push(this.asBlockquote(header));
 

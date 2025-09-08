@@ -182,7 +182,7 @@ export class IframeReaderBridge {
 
 	initReader(opts: CreateReaderOptions) {
 		return this.enqueueOrRun(async () => {
-			await this.remote!.initReader(this.sourceFilePath,opts);
+			await this.remote!.initReader(this.sourceFilePath, opts);
 		});
 	}
 
@@ -192,9 +192,9 @@ export class IframeReaderBridge {
 		});
 	}
 
-	navigateToAnnotation(annotationId: string) {
+	navigate(navigationInfo: any) {
 		return this.enqueueOrRun(async () => {
-			await this.remote!.navigate({ annotationID: annotationId });
+			await this.remote!.navigate(navigationInfo);
 		});
 	}
 
