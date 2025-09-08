@@ -54,14 +54,18 @@ export type ParentApi = {
 		annotationId: string,
 		options: Partial<MarkdownEditorProps>
 	) => Promise<{ ok: true }>;
-
 };
 
 export type ChildApi = {
 	// parent → child
-	initReader: (opts: CreateReaderOptions) => Promise<{ ok: true }>;
+	initReader: (
+		obsidianSourceFilePath: string,
+		opts: CreateReaderOptions
+	) => Promise<{ ok: true }>;
 	setColorScheme: (colorScheme: ColorScheme) => Promise<{ ok: true }>;
-	updateAnnotation: (annotation: Partial<ZoteroAnnotation>) => Promise<{ ok: true }>;
+	updateAnnotation: (
+		annotation: Partial<ZoteroAnnotation>
+	) => Promise<{ ok: true }>;
 	navigate: (location: { annotationID: string }) => Promise<{ ok: true }>;
 	destroy: () => Promise<{ ok: true }>;
 };

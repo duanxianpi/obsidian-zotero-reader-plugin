@@ -5,6 +5,5 @@
 	"description": "A Zotero reader plugin for Obsidian",
 	"author": "Xianpi Duan",
 	"authorUrl": "https://github.com/duanxianpi/",
-	"fundingUrl": "https://obsidian.md/pricing",
 	"isDesktopOnly": false
 }

@@ -229,7 +229,7 @@ export class AnnotationManager {
 			sourceText + (pageLabel ? `, page ${pageLabel}` : "");
 		const color = ANNOTATION_COLORS.get(json.color) || "yellow";
 
-		const header = `[!${json.type}-${color}] [${displayText}](obsidian://zotero-reader?file=${encodeURIComponent(
+		const header = `[!ozrp-${json.type}-${color}] [${displayText}](obsidian://zotero-reader?file=${encodeURIComponent(
 			this.file.path
 		)}&annotation=${json.id})`;
 

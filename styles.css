@@ -76,50 +76,50 @@
 	padding-left: 5px;
 }
 
-.callout[data-callout$="yellow"] {
+.callout[data-callout^="ozrp"][data-callout$="yellow"] {
 	--callout-color: var(--color-yellow-rgb);
 }
 
-.callout[data-callout$="red"] {
+.callout[data-callout^="ozrp"][data-callout$="red"] {
 	--callout-color: var(--color-red-rgb);
 }
 
-.callout[data-callout$="green"] {
+.callout[data-callout^="ozrp"][data-callout$="green"] {
 	--callout-color: var(--color-green-rgb);
 }
 
-.callout[data-callout$="blue"] {
+.callout[data-callout^="ozrp"][data-callout$="blue"] {
 	--callout-color: var(--color-blue-rgb);
 }
 
-.callout[data-callout$="purple"] {
+.callout[data-callout^="ozrp"][data-callout$="purple"] {
 	--callout-color: var(--color-purple-rgb);
 }
 
-.callout[data-callout$="magenta"] {
+.callout[data-callout^="ozrp"][data-callout$="magenta"] {
 	--callout-color: var(--color-pink-rgb);
 }
 
-.callout[data-callout$="orange"] {
+.callout[data-callout^="ozrp"][data-callout$="orange"] {
 	--callout-color: var(--color-orange-rgb);
 }
 
-.callout[data-callout$="gray"] {
+.callout[data-callout^="ozrp"][data-callout$="gray"] {
 	--callout-color: var(--callout-quote);
 }
 
-.callout[data-callout^="highlight"] {
+.callout[data-callout^="ozrp-highlight"] {
 	--callout-icon: zotero-highlight;
 }
 
-.callout[data-callout^="underline"] {
+.callout[data-callout^="ozrp-underline"] {
 	--callout-icon: zotero-underline;
 }
 
-.callout[data-callout^="text"] {
+.callout[data-callout^="ozrp-text"] {
 	--callout-icon: zotero-text;
 }
 
-.callout[data-callout^="note"] {
+.callout[data-callout^="ozrp-note"] {
 	--callout-icon: zotero-note;
 }

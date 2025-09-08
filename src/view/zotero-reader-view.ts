@@ -61,6 +61,10 @@ export class ZoteroReaderView extends ItemView {
 		this.fileFrontmatter = this.app.metadataCache.getFileCache(this.file)
 			?.frontmatter as Record<string, unknown> | undefined;
 
+		if (!this.fileFrontmatter) {
+			return;
+		}
+
 		// Get file content
 		const content = await this.app.vault.read(this.file);
 
@@ -91,7 +95,8 @@ export class ZoteroReaderView extends ItemView {
 			!this.state ||
 			!this.state.sourceFilePath ||
 			!this.state.sourceViewState ||
-			!this.file
+			!this.file ||
+			!this.fileFrontmatter
 		) {
 			return;
 		}
@@ -109,7 +114,147 @@ export class ZoteroReaderView extends ItemView {
 		container.appendChild(loader);
 
 		try {
-			await this.initializeReader();
+			// Create bridge once
+			if (!this.bridge) {
+				container.style.overflow = "hidden";
+				container.style.padding = "unset";
+
+				this.bridge = new IframeReaderBridge(
+					container,
+					this.state.sourceFilePath
+				);
+
+				// Register event listeners
+				this.bridge.onEventType("error", (evt) => {
+					console.error(`${evt.code}: ${evt.message}`);
+				});
+
+				this.bridge.onEventType("ready", (evt) => {
+					console.log("Reader is ready");
+				});
+
+				this.bridge.onEventType("sidebarToggled", (evt) => {
+					console.log("Sidebar toggled:", evt.open);
+				});
+
+				this.bridge.onEventType("openLink", (evt) => {
+					console.log("Opening link:", evt.url);
+					// Handle link opening logic here
+				});
+
+				this.bridge.onEventType("annotationsSaved", (evt) => {
+					console.log("Annotations saved:", evt.annotations);
+					this.handleAnnotationsSaved(evt.annotations);
+				});
+
+				this.bridge.onEventType("annotationsDeleted", (evt) => {
+					console.log("Annotations deleted:", evt.ids);
+					this.handleAnnotationsDeleted(evt.ids);
+				});
+
+				this.bridge.onEventType("viewStateChanged", (evt) => {
+					console.log(
+						"View state changed:",
+						evt.state,
+						"Primary:",
+						evt.primary
+					);
+				});
+
+				// Observe color scheme changes once and delegate to bridge
+				this.colorSchemeObserver = new MutationObserver(() => {
+					const newColorScheme = getComputedStyle(document.body)
+						.colorScheme as ColorScheme;
+					if (newColorScheme && newColorScheme !== this.colorScheme) {
+						this.bridge!.setColorScheme(newColorScheme);
+						this.colorScheme = newColorScheme;
+					}
+				});
+				this.colorSchemeObserver.observe(document.body, {
+					attributes: true,
+					attributeFilter: ["class"],
+				});
+
+				await this.bridge.connect();
+			}
+
+			// Update the source file path in the bridge
+			if (this.bridge && this.file?.path) {
+				this.bridge.setSourceFilePath(this.file.path);
+			}
+
+			const source = this.fileFrontmatter?.["source"] as string;
+
+			const trimmedSource = source.trim();
+			let sourceType: "local" | "url" = "local";
+
+			if (
+				trimmedSource.startsWith("http://") ||
+				trimmedSource.startsWith("https://")
+			) {
+				sourceType = "url";
+			} else {
+				sourceType = "local";
+			}
+
+			const extension = trimmedSource.split(".").pop();
+			if (!extension) throw new Error("Invalid file extension");
+			let readerType: "pdf" | "epub" | "snapshot";
+			switch (extension.toLowerCase()) {
+				case "pdf":
+					readerType = "pdf";
+					break;
+				case "epub":
+					readerType = "epub";
+					break;
+				case "html":
+					readerType = "snapshot";
+					break;
+				default:
+					throw new Error("Unsupported file type: " + extension);
+			}
+
+			// Parse annotations from the current markdown file
+			const annotations = await this.parseAnnotationsFromFile();
+
+			const opts = {
+				...this.state.readerOptions,
+				colorScheme: this.colorScheme,
+				annotations: annotations,
+				sidebarOpen: false,
+			};
+
+			switch (sourceType) {
+				case "local":
+					const localFile =
+						this.app.vault.getFileByPath(trimmedSource);
+					if (!localFile || !(localFile instanceof TFile)) {
+						throw new Error(
+							"Local file not found:" + this.state.source
+						);
+					}
+					const arrayBuffer = await this.app.vault.readBinary(
+						localFile
+					);
+
+					await this.bridge.initReader({
+						data: { buf: new Uint8Array(arrayBuffer) },
+						type: readerType,
+						...opts,
+					});
+					break;
+				case "url":
+					await this.bridge.initReader({
+						data: { url: trimmedSource },
+						type: readerType,
+						...opts,
+					});
+					break;
+				default:
+					throw new Error(
+						"Unknown source type:" + this.state.sourceType
+					);
+			}
 		} catch (e) {
 			console.error("Error loading Zotero Reader view:", e);
 			container.empty();
@@ -123,144 +268,6 @@ export class ZoteroReaderView extends ItemView {
 				.createEl("span")
 				.appendText("Error details: " + e.message);
 			container.appendChild(errorMessage);
-		}
-	}
-
-	private async initializeReader() {
-		const container = this.containerEl.children[1] as HTMLElement;
-		// Create bridge once
-		if (!this.bridge) {
-			container.style.overflow = "hidden";
-			container.style.padding = "unset";
-
-			this.bridge = new IframeReaderBridge(
-				container,
-				(window as any).BLOB_URL_MAP["reader.html"],
-				["*"]
-			);
-
-			// Register event listeners
-			this.bridge.onEventType("error", (evt) => {
-				console.error(`${evt.code}: ${evt.message}`);
-			});
-
-			this.bridge.onEventType("ready", (evt) => {
-				console.log("Reader is ready");
-			});
-
-			this.bridge.onEventType("sidebarToggled", (evt) => {
-				console.log("Sidebar toggled:", evt.open);
-			});
-
-			this.bridge.onEventType("openLink", (evt) => {
-				console.log("Opening link:", evt.url);
-				// Handle link opening logic here
-			});
-
-			this.bridge.onEventType("annotationsSaved", (evt) => {
-				console.log("Annotations saved:", evt.annotations);
-				this.handleAnnotationsSaved(evt.annotations);
-			});
-
-			this.bridge.onEventType("annotationsDeleted", (evt) => {
-				console.log("Annotations deleted:", evt.ids);
-				this.handleAnnotationsDeleted(evt.ids);
-			});
-
-			this.bridge.onEventType("viewStateChanged", (evt) => {
-				console.log(
-					"View state changed:",
-					evt.state,
-					"Primary:",
-					evt.primary
-				);
-			});
-
-			// Observe color scheme changes once and delegate to bridge
-			this.colorSchemeObserver = new MutationObserver(() => {
-				const newColorScheme = getComputedStyle(document.body)
-					.colorScheme as ColorScheme;
-				if (newColorScheme && newColorScheme !== this.colorScheme) {
-					this.bridge!.setColorScheme(newColorScheme);
-					this.colorScheme = newColorScheme;
-				}
-			});
-			this.colorSchemeObserver.observe(document.body, {
-				attributes: true,
-				attributeFilter: ["class"],
-			});
-
-			await this.bridge.connect();
-		}
-
-		const source = this.fileFrontmatter?.["source"] as string;
-
-		const trimmedSource = source.trim();
-		let sourceType: "local" | "url" = "local";
-
-		if (typeof source === "string") {
-			if (
-				trimmedSource.startsWith("http://") ||
-				trimmedSource.startsWith("https://")
-			) {
-				sourceType = "url";
-			} else {
-				sourceType = "local";
-			}
-		}
-
-		const extension = trimmedSource.split(".").pop();
-		if (!extension) throw new Error("Invalid file extension");
-		let readerType: "pdf" | "epub" | "snapshot";
-		switch (extension.toLowerCase()) {
-			case "pdf":
-				readerType = "pdf";
-				break;
-			case "epub":
-				readerType = "epub";
-				break;
-			case "html":
-				readerType = "snapshot";
-				break;
-			default:
-				throw new Error("Unsupported file type: " + extension);
-		}
-
-		// Parse annotations from the current markdown file
-		const annotations = await this.parseAnnotationsFromFile();
-
-		const opts = {
-			...this.state.readerOptions,
-			colorScheme: this.colorScheme,
-			annotations: annotations,
-			sidebarOpen: false
-		};
-
-		switch (sourceType) {
-			case "local":
-				const localFile = this.app.vault.getFileByPath(trimmedSource);
-				if (!localFile || !(localFile instanceof TFile)) {
-					throw new Error(
-						"Local file not found:" + this.state.source
-					);
-				}
-				const arrayBuffer = await this.app.vault.readBinary(localFile);
-
-				await this.bridge.initReader({
-					data: { buf: new Uint8Array(arrayBuffer) },
-					type: readerType,
-					...opts,
-				});
-				break;
-			case "url":
-				await this.bridge.initReader({
-					data: { url: trimmedSource },
-					type: readerType,
-					...opts,
-				});
-				break;
-			default:
-				throw new Error("Unknown source type:" + this.state.sourceType);
 		}
 	}
 

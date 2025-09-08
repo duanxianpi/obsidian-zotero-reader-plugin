@@ -12,6 +12,7 @@ import {
 	MarkdownEditorProps,
 } from "../editor/markdownEditor";
 import { EditorView, keymap, placeholder, ViewUpdate } from "@codemirror/view";
+import { App } from "obsidian";
 
 type BridgeState = "idle" | "connecting" | "ready" | "disposing" | "disposed";
 
@@ -28,10 +29,12 @@ export class IframeReaderBridge {
 	private connectTimeoutMs = 8000;
 	private editorList: EmbeddableMarkdownEditor[] = [];
 
+	private src = (window as any).BLOB_URL_MAP["reader.html"];
+	private allowedOrigins: string[] = ["*"];
+
 	constructor(
 		private container: HTMLElement,
-		private src: string,
-		private allowedOrigins: string[] = ["*"]
+		private sourceFilePath: string
 	) {}
 
 	/**
@@ -123,7 +126,9 @@ export class IframeReaderBridge {
 						},
 						onBlur: (editor) => {
 							editor.activeCM.dispatch({
-								effects: EditorView.scrollIntoView(0, { y: "start" })
+								effects: EditorView.scrollIntoView(0, {
+									y: "start",
+								}),
 							});
 						},
 					}
@@ -177,7 +182,7 @@ export class IframeReaderBridge {
 
 	initReader(opts: CreateReaderOptions) {
 		return this.enqueueOrRun(async () => {
-			await this.remote!.initReader(opts);
+			await this.remote!.initReader(this.sourceFilePath,opts);
 		});
 	}
 
@@ -189,8 +194,24 @@ export class IframeReaderBridge {
 
 	navigateToAnnotation(annotationId: string) {
 		return this.enqueueOrRun(async () => {
-			await this.remote!.navigate({ annotationID: annotationId});
+			await this.remote!.navigate({ annotationID: annotationId });
 		});
+	}
+
+	/**
+	 * Set the source file path for the current view
+	 * @param path The absolute path to the source file
+	 */
+	setSourceFilePath(path: string) {
+		this.sourceFilePath = path;
+	}
+
+	/**
+	 * Get the current source file path
+	 * @returns The absolute path to the source file
+	 */
+	getSourceFilePath(): string {
+		return this.sourceFilePath;
 	}
 
 	async dispose() {
