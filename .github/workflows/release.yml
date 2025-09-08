@@ -9,27 +9,23 @@ env:
   PLUGIN_NAME: obsidian-zotero-reader # Change this to match the id of your plugin.
 
 jobs:
-  build_reader:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
-        with:
-          node-version: "18.x"
-      - name: Build reader pdf.js
-        working-directory: reader/reader
-        run: |
-          npm ci
-          npm run build:pdf.js
-  build_plugin:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
-      - name: Use Node.js
-        uses: actions/setup-node@v1
         with:
-          node-version: "14.x"
+          submodules: recursive
+      - name: Use Node.js
+      - uses: actions/setup-node@v1
+        with:
+          node-version: "22.x"
+
+      - name: Build Reader
+        working-directory: reader/reader
+        run: |
+          npm install
+          npm run build
 
       - name: Build main plugin
         id: build
