@@ -12,8 +12,14 @@ import {
 	MarkdownEditorProps,
 } from "../editor/markdownEditor";
 import { EditorView, keymap, placeholder, ViewUpdate } from "@codemirror/view";
+import { App } from "obsidian";
 
-type BridgeState = "idle" | "connecting" | "ready" | "disposing" | "disposed";
+type BridgeState =
+	| "idle"
+	| "connecting"
+	| "ready"
+	| "disposing"
+	| "disposed";
 
 export class IframeReaderBridge {
 	private iframe: HTMLIFrameElement | null = null;
@@ -27,11 +33,14 @@ export class IframeReaderBridge {
 	>();
 	private connectTimeoutMs = 8000;
 	private editorList: EmbeddableMarkdownEditor[] = [];
+	private _readerOpts: CreateReaderOptions | undefined;
+
+	private src = (window as any).BLOB_URL_MAP["reader.html"];
+	private allowedOrigins: string[] = ["*"];
 
 	constructor(
 		private container: HTMLElement,
-		private src: string,
-		private allowedOrigins: string[] = ["*"]
+		private sourceFilePath: string
 	) {}
 
 	/**
@@ -77,7 +86,7 @@ export class IframeReaderBridge {
 	}
 
 	async connect() {
-		if (this.state !== "idle") return;
+		if (this.state !== "idle" && this.state !== "disposed") return;
 		this.state = "connecting";
 
 		// Create iframe once
@@ -90,6 +99,18 @@ export class IframeReaderBridge {
 		this.iframe.sandbox.add("allow-forms");
 
 		this.container.replaceChildren(this.iframe);
+
+		this.iframe.onload = () => {
+			// Only handle unexpected reloads when we're in a stable state
+			if (this.state === "ready" && this._readerOpts) {
+				// It was loaded before, but it was loaded again somehow
+				// We need to reconnect but avoid infinite loop
+				console.warn("Iframe reloaded unexpectedly, triggering reconnection");
+				// Use setTimeout to avoid potential stack overflow
+				setTimeout(() => this.reconnect(), 0);
+			}
+		};
+
 
 		// Parent API exposed to child (event channel)
 		const parentApi: ParentApi = {
@@ -123,7 +144,9 @@ export class IframeReaderBridge {
 						},
 						onBlur: (editor) => {
 							editor.activeCM.dispatch({
-								effects: EditorView.scrollIntoView(0, { y: "start" })
+								effects: EditorView.scrollIntoView(0, {
+									y: "start",
+								}),
 							});
 						},
 					}
@@ -157,6 +180,12 @@ export class IframeReaderBridge {
 		]);
 		this.remote = remote;
 		this.state = "ready";
+		console.log("Child proxy connected", this.remote);
+
+		// If this is a reconnection and we have reader options, re-initialize the reader
+		if (this._readerOpts) {
+			await this.remote.initReader(this.sourceFilePath, this._readerOpts);
+		}
 
 		// Drain queued calls
 		const tasks = [...this.queue];
@@ -176,8 +205,9 @@ export class IframeReaderBridge {
 	}
 
 	initReader(opts: CreateReaderOptions) {
+		this._readerOpts = opts;
 		return this.enqueueOrRun(async () => {
-			await this.remote!.initReader(opts);
+			await this.remote!.initReader(this.sourceFilePath, opts);
 		});
 	}
 
@@ -187,7 +217,29 @@ export class IframeReaderBridge {
 		});
 	}
 
-	async dispose() {
+	navigate(navigationInfo: any) {
+		return this.enqueueOrRun(async () => {
+			await this.remote!.navigate(navigationInfo);
+		});
+	}
+
+	/**
+	 * Set the source file path for the current view
+	 * @param path The absolute path to the source file
+	 */
+	setSourceFilePath(path: string) {
+		this.sourceFilePath = path;
+	}
+
+	/**
+	 * Get the current source file path
+	 * @returns The absolute path to the source file
+	 */
+	getSourceFilePath(): string {
+		return this.sourceFilePath;
+	}
+
+	async dispose(clearListeners = true) {
 		if (!this.conn || this.state === "disposed") return;
 		this.editorList.forEach((editor) => editor.onunload());
 		this.state = "disposing";
@@ -196,7 +248,14 @@ export class IframeReaderBridge {
 		this.remote = undefined;
 		this.iframe?.remove();
 		this.iframe = null;
-		this.typedListeners.clear();
+		if (clearListeners) {
+			this.typedListeners.clear();
+		}
 		this.state = "disposed";
+	}
+
+	async reconnect() {
+		await this.dispose(false); // Don't clear listeners during reconnection
+		return this.connect();
 	}
 }

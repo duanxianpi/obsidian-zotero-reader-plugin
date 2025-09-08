@@ -9,6 +9,8 @@ export interface CreateReaderOptions {
 	sidebarOpen?: boolean;
 	colorScheme: ColorScheme;
 	annotations: ZoteroAnnotation[];
+	primaryViewState?: Record<string, unknown>;
+	secondaryViewState?: Record<string, unknown>;
 }
 
 export type ChildEvents =
@@ -54,14 +56,19 @@ export type ParentApi = {
 		annotationId: string,
 		options: Partial<MarkdownEditorProps>
 	) => Promise<{ ok: true }>;
-
 };
 
 export type ChildApi = {
 	// parent → child
-	initReader: (opts: CreateReaderOptions) => Promise<{ ok: true }>;
+	initReader: (
+		obsidianSourceFilePath: string,
+		opts: CreateReaderOptions
+	) => Promise<{ ok: true }>;
 	setColorScheme: (colorScheme: ColorScheme) => Promise<{ ok: true }>;
-	updateAnnotation: (annotation: Partial<ZoteroAnnotation>) => Promise<{ ok: true }>;
+	updateAnnotation: (
+		annotation: Partial<ZoteroAnnotation>
+	) => Promise<{ ok: true }>;
+	navigate: (navigationInfo: any) => Promise<{ ok: true }>;
 	destroy: () => Promise<{ ok: true }>;
 };
 

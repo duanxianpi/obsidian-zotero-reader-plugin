@@ -1,12 +1,12 @@
 {
 	"name": "obsidian-zotero-reader-plugin",
-	"version": "0.2.0",
+	"version": "1.0.0",
 	"description": "A Zotero reader plugin for Obsidian",
 	"main": "main.js",
 	"scripts": {
 		"dev:reader": "cd reader/reader && npm install && webpack --config webpack.obsidian.js --mode development --watch",
 		"dev:plugin": "webpack --watch --mode=development",
-		"build": "npm run build:reader && npm run build:plugin",
+		"build": "cd reader/reader && npm run build:pdf.js && cd ../.. && npm run build:reader && npm run build:plugin",
 		"build:pdf.js": "cd reader/reader && npm run build:pdf.js",
 		"build:reader": "cd reader/reader && npm install && webpack --config webpack.obsidian.js --mode production",
 		"build:plugin": "tsc -noEmit -skipLibCheck && webpack --config webpack.config.js --mode production",
