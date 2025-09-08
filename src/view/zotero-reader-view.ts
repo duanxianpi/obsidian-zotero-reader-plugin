@@ -410,6 +410,8 @@ export class ZoteroReaderView extends ItemView {
 	}
 
 	async onOpen() {
+		console.log("Reloading reader view");
+
 		// Find the actions element in the header, similar to main.ts approach
 		const actionsEl = (this as any).actionsEl as HTMLElement | undefined;
 
@@ -438,10 +440,14 @@ export class ZoteroReaderView extends ItemView {
 	}
 
 	async onClose() {
+		console.log("Closing reader view");
 		this.colorSchemeObserver?.disconnect();
 		this.colorSchemeObserver = undefined;
 		await this.bridge?.dispose();
 		const container = this.containerEl;
 		container.empty();
+	}
+	async onunload() {
+		console.log("Unloading reader view");
 	}
 }
