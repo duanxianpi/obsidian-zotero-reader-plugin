@@ -1,9 +1,11 @@
 {
-	"id": "zotero-reader",
-	"name": "Zotero Reader",
-	"minAppVersion": "0.0.0",
+	"id": "obsidian-zotero-reader",
+	"name": "Obsidian Zotero Reader",
+	"minAppVersion": "1.8.10",
 	"description": "A Zotero reader plugin for Obsidian",
 	"author": "Xianpi Duan",
 	"authorUrl": "https://github.com/duanxianpi/",
-	"isDesktopOnly": false
+	"fundingUrl": "https://buymeacoffee.com/duanxianpi",
+	"isDesktopOnly": false,
+	"version": "1.0.0"
 }

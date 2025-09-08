@@ -249,13 +249,11 @@ export class AnnotationManager {
 
 		// Comment (optional but we always include the block for stability)
 		const comment = json.comment || "";
-		// pieces.push("> " + OzrpAnnoMarks.C_BEGIN);
 		pieces.push(
 			this.asBlockquote(
-				ensureTrailingNL(`${OzrpAnnoMarks.C_BEGIN} ${comment}`)
+				ensureTrailingNL(`${OzrpAnnoMarks.C_BEGIN} ${comment} ${OzrpAnnoMarks.C_END} ^${json.id}`)
 			)
 		);
-		pieces.push("> " + OzrpAnnoMarks.C_END + ` ^${json.id}`);
 		pieces.push("");
 
 		pieces.push(OzrpAnnoMarks.END);
