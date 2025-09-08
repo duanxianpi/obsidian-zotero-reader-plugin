@@ -19,11 +19,17 @@ jobs:
         with:
           node-version: "14.x"
 
-      - name: Build
-        id: build
+      - name: Build reader subproject
+        working-directory: reader/reader
         run: |
           npm install
           npm run build
+
+      - name: Build main plugin
+        id: build
+        run: |
+          npm install
+          npm run build:plugin
           mkdir ${{ env.PLUGIN_NAME }}
           cp main.js manifest.json styles.css ${{ env.PLUGIN_NAME }}
           zip -r ${{ env.PLUGIN_NAME }}.zip ${{ env.PLUGIN_NAME }}

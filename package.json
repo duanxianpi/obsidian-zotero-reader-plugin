@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev:reader": "cd reader/reader && npm install && webpack --config webpack.obsidian.js --mode development --watch",
 		"dev:plugin": "webpack --watch --mode=development",
-		"build": "cd reader/reader && npm run build:pdf.js && cd ../.. && npm run build:reader && npm run build:plugin",
+		"build": "npm run build:reader && npm run build:plugin",
 		"build:pdf.js": "cd reader/reader && npm run build:pdf.js",
 		"build:reader": "cd reader/reader && npm install && webpack --config webpack.obsidian.js --mode production",
 		"build:plugin": "tsc -noEmit -skipLibCheck && webpack --config webpack.config.js --mode production",
