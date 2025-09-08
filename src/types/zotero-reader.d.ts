@@ -9,6 +9,8 @@ export interface CreateReaderOptions {
 	sidebarOpen?: boolean;
 	colorScheme: ColorScheme;
 	annotations: ZoteroAnnotation[];
+	primaryViewState?: Record<string, unknown>;
+	secondaryViewState?: Record<string, unknown>;
 }
 
 export type ChildEvents =

@@ -153,12 +153,7 @@ export class ZoteroReaderView extends ItemView {
 				});
 
 				this.bridge.onEventType("viewStateChanged", (evt) => {
-					console.log(
-						"View state changed:",
-						evt.state,
-						"Primary:",
-						evt.primary
-					);
+					this.handleViewStateChanged(evt.state, evt.primary);
 				});
 
 				// Observe color scheme changes once and delegate to bridge
@@ -217,11 +212,21 @@ export class ZoteroReaderView extends ItemView {
 			// Parse annotations from the current markdown file
 			const annotations = await this.parseAnnotationsFromFile();
 
+			// Get stored view states from frontmatter
+			const primaryViewState = this.fileFrontmatter?.[
+				"primaryViewState"
+			] as Record<string, unknown> | undefined;
+			const secondaryViewState = this.fileFrontmatter?.[
+				"secondaryViewState"
+			] as Record<string, unknown> | undefined;
+
 			const opts = {
 				...this.state.readerOptions,
 				colorScheme: this.colorScheme,
 				annotations: annotations,
 				sidebarOpen: false,
+				primaryViewState,
+				secondaryViewState,
 			};
 
 			switch (sourceType) {
@@ -301,6 +306,46 @@ export class ZoteroReaderView extends ItemView {
 			console.error("Error parsing annotations from file:", error);
 			return [];
 		}
+	}
+
+	private async handleViewStateChanged(state: unknown, primary: boolean) {
+		if (!this.file || !this.fileFrontmatter) return;
+
+		try {
+			const key = primary ? "primaryViewState" : "secondaryViewState";
+			await this.updateFrontmatterProperty(key, state as Object);
+
+			// Update local frontmatter cache
+			if (primary) {
+				this.fileFrontmatter.primaryViewState = state;
+			} else {
+				this.fileFrontmatter.secondaryViewState = state;
+			}
+		} catch (error) {
+			console.error("Error updating view state in frontmatter:", error);
+		}
+	}
+
+	private async updateFrontmatterProperty(key: string, value: unknown) {
+		if (!this.file) return;
+
+		await this.app.fileManager.processFrontMatter(this.file, (fm) => {
+			fm[key] = value;
+		});
+
+		// Refresh the frontmatter cache after modification
+		await this.refreshFrontmatter();
+	}
+
+	private async refreshFrontmatter() {
+		if (!this.file) return;
+
+		// Wait a bit for the metadata cache to update
+		setTimeout(() => {
+			this.fileFrontmatter = this.app.metadataCache.getFileCache(
+				this.file!
+			)?.frontmatter as Record<string, unknown> | undefined;
+		}, 100);
 	}
 
 	private async handleAnnotationsSaved(annotations: ZoteroAnnotation[]) {

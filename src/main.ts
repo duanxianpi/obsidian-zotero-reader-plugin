@@ -276,7 +276,6 @@ export default class ZoteroReaderPlugin extends Plugin {
 
 	/**
 	 * Handle protocol calls for zotero-reader
-	 * Expected URL format: obsidian://zotero-reader?filePath=path/to/file.md&sourceViewState=encoded_state
 	 */
 	private async handleProtocolCall(
 		params: ObsidianProtocolData
@@ -363,16 +362,6 @@ export default class ZoteroReaderPlugin extends Plugin {
 			},
 			active: true,
 		});
-	}
-
-	/**
-	 * Generate a protocol URL for opening a ZoteroReaderView
-	 */
-	public generateZoteroReaderURL(filePath: string): string {
-		const params = new URLSearchParams();
-		params.set("file", filePath);
-
-		return `obsidian://zotero-reader?${params.toString()}`;
 	}
 }
 
