@@ -1,12 +1,14 @@
-# Obsidian Zotero Reader (Beta)
-
+<h1 align="center">Obsidian Zotero Reader (Beta)</h1>
+<div align="center">
+	
 [![GitHub Stars](https://img.shields.io/github/stars/duanxianpi/obsidian-zotero-reader-plugin?style=social)](https://github.com/duanxianpi/obsidian-zotero-reader-plugin/stargazers)
 [![Issues](https://img.shields.io/github/issues/duanxianpi/obsidian-zotero-reader-plugin)](https://github.com/duanxianpi/obsidian-zotero-reader-plugin/issues)
 [![PRs](https://img.shields.io/github/issues-pr/duanxianpi/obsidian-zotero-reader-plugin)](https://github.com/duanxianpi/obsidian-zotero-reader-plugin/pulls)
 ![Status](https://img.shields.io/badge/status-beta-yellow)
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%F0%9F%8D%BA-ffdd00)](https://buymeacoffee.com/duanxianpi)
-
-Read and annotate PDFs/EPUB/HTML inside Obsidian with Zotero-powered convenience. This plugin adds a reader pane and utilities for linking annotations back to your notes.
+[![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord\&logoColor=white)](https://discord.gg/KwTkAhVc)
+ 
+</div>
+Read and annotate PDFs/EPUB/HTML inside Obsidian with awesome Zotero Reader! This plugin adds the zotero reader and utilities for linking annotations back to your notes.
 
 ---
 
@@ -31,8 +33,8 @@ Read and annotate PDFs/EPUB/HTML inside Obsidian with Zotero-powered convenience
 ---
 
 ## Usage
-
-Add the following YAML frontmatter to any Markdown file. The `source` can point to a local `pdf`, `epub`, or `html` file.
+1. Create a new md file
+2. Add the following YAML frontmatter to the Markdown file. The `source` can point to a local/network `pdf`, `epub`, or `html` file.
 
 ```yaml
 ---
@@ -78,12 +80,22 @@ npm run dev:plugin
 * `dev:plugin` – builds the Obsidian plugin in watch mode.
 
 ---
+## Acknowledgments
+
+Special thanks to the [Zotero](https://github.com/zotero/zotero) team for the excellent Reader that inspired this plugin.
+
+---
 
 ## Sponsor
 
-If you find this useful, you can support development here:
+Thanks for checking out the plugin! I’m currently a student and working on this plugin nights and weekends. If it’s useful to you, a small tip will help me keep shipping features.
 
-👉 **[https://buymeacoffee.com/duanxianpi](https://buymeacoffee.com/duanxianpi)**
+<div>
+	<a href="https://www.buymeacoffee.com/duanxianpi" target="_blank" title="buymeacoffee">
+	  <img src="https://iili.io/JoQ0zN9.md.png"  alt="buymeacoffee-orange-badge" style="width: 200px;">
+	</a>
+</div>
+
 
 ---
 
@@ -96,4 +108,4 @@ If you find this useful, you can support development here:
 
 Have ideas or found a bug? Please join the discord server!
 
-[![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord\&logoColor=white)](https://discord.gg/KwTkAhVc)
+<a href="https://discord.gg/KwTkAhVc"> <img alt="Join our Discord" src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white&style=for-the-badge"> </a>
