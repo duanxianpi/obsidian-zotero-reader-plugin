@@ -14,10 +14,6 @@ Read and annotate PDFs/EPUB/HTML inside Obsidian with awesome Zotero Reader! Thi
 
 ## Demo
 
-> **Drop your GIF here**
->
-> Place a demo GIF at `docs/demo.gif` (or update the path) and it will render below.
-
 ![Demo](docs/demo.gif)
 
 ---
@@ -45,6 +41,15 @@ source: path/to/file.pdf # or .epub / .html
 
 Then open the note and **click the icon in the top-right** to launch the reader.
 
+### Annotation
+![anno](docs/anno.gif)
+
+### Theme
+![theme](docs/theme.gif)
+
+### Link
+![theme](docs/link.gif)
+
 ---
 
 ## Features
@@ -53,6 +58,8 @@ Then open the note and **click the icon in the top-right** to launch the reader.
 * **Copy link to annotation** – Grab a direct link to a specific annotation.
 * **Copy link to selection** – Link to any text selection for precise references.
 * **Annotate with Obsidian’s editor** – Annotate with Obsidian's Markdown editor directly!
+* **Sync Color Theme** - Auto Sync the theme with Obsidian.
+* **Pure Markdown** - No extra json, store with pure markdown.
 
 ---
 
