@@ -440,14 +440,10 @@ export class ZoteroReaderView extends ItemView {
 	}
 
 	async onClose() {
-		console.log("Closing reader view");
 		this.colorSchemeObserver?.disconnect();
 		this.colorSchemeObserver = undefined;
 		await this.bridge?.dispose();
 		const container = this.containerEl;
 		container.empty();
-	}
-	async onunload() {
-		console.log("Unloading reader view");
 	}
 }
