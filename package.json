@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-zotero-reader-plugin",
-	"version": "1.0.8",
+	"version": "1.0.9",
 	"description": "A Zotero reader plugin for Obsidian",
 	"main": "main.js",
 	"scripts": {
