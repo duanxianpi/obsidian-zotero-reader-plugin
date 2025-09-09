@@ -5,6 +5,8 @@ import {
 	ItemView,
 	getIcon,
 	ButtonComponent,
+	getFrontMatterInfo,
+	parseYaml,
 } from "obsidian";
 import { IframeReaderBridge } from "./zotero-reader-bridge";
 import {
@@ -58,21 +60,30 @@ export class ZoteroReaderView extends ItemView {
 			return;
 		}
 
+		// Get file content
+		const content = await this.app.vault.read(this.file);
+
 		this.fileFrontmatter = this.app.metadataCache.getFileCache(this.file)
 			?.frontmatter as Record<string, unknown> | undefined;
 
 		if (!this.fileFrontmatter) {
-			return;
-		}
+			// find the frontmatter block at the top of the file
+			const info = getFrontMatterInfo(content);
 
-		// Get file content
-		const content = await this.app.vault.read(this.file);
+			if (!info || !info.frontmatter) return;
+
+			// turn the YAML string into a JS object
+			this.fileFrontmatter = parseYaml(info.frontmatter) as Record<
+				string,
+				unknown
+			>;
+		}
 
 		// Initialize annotation manager
 		this.annotationManager = new AnnotationManager(
 			this.app.vault,
-			this.app.metadataCache,
 			this.file,
+			this.fileFrontmatter,
 			content
 		);
 

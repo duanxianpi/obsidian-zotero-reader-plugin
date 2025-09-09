@@ -10,6 +10,7 @@ import { TFile, Vault, MetadataCache } from "obsidian";
 import { AnnotationParser, OzrpAnnoMarks } from "../parser/annotation-parser";
 import { ParsedAnnotation, ZoteroAnnotation } from "../types/zotero-reader";
 
+
 export interface AnnotationInsertOptions {
 	insertAt?: "beginning" | "end" | "after-frontmatter"; // default: end
 }
@@ -36,23 +37,41 @@ const ensureTrailingNL = (s: string) => (s.endsWith("\n") ? s : s + "\n");
 export class AnnotationManager {
 	private file: TFile;
 	private vault: Vault;
-	private metadataCache: MetadataCache;
-
+	private frontmatter: Record<string, unknown>;
 	private _annotationMap: Map<string, ParsedAnnotation>;
+	private _operationLock: Promise<void> = Promise.resolve();
+
 	public get annotationMap(): Map<string, ParsedAnnotation> {
 		return this._annotationMap;
 	}
 	constructor(
 		vault: Vault,
-		metadataCache: MetadataCache,
 		file: TFile,
-		content: string
+		frontmatter: Record<string, unknown>,
+		content: string,
 	) {
 		this.file = file;
 		this.vault = vault;
-		this.metadataCache = metadataCache;
-
+		this.frontmatter = frontmatter;
 		this._annotationMap = AnnotationParser.parseWithRanges(content);
+	}
+
+	/**
+	 * Execute an operation under lock to prevent race conditions
+	 */
+	private async withLock<T>(operation: () => Promise<T>): Promise<T> {
+		const currentLock = this._operationLock;
+		let resolveLock: () => void;
+		this._operationLock = new Promise(resolve => {
+			resolveLock = resolve;
+		});
+
+		try {
+			await currentLock;
+			return await operation();
+		} finally {
+			resolveLock!();
+		}
 	}
 
 	/**
@@ -63,19 +82,21 @@ export class AnnotationManager {
 		data: { json: ZoteroAnnotation },
 		options: AnnotationInsertOptions = {}
 	): Promise<boolean> {
-		const content = await this.vault.read(this.file);
+		return this.withLock(async () => {
+			const content = await this.vault.read(this.file);
 
-		const section = this.buildAnnotationSection(data.json);
+			const section = this.buildAnnotationSection(data.json);
 
-		const updated = this.insertByStrategy(
-			content,
-			section,
-			options.insertAt ?? "end"
-		);
-		await this.vault.modify(this.file, updated);
-		this._annotationMap = AnnotationParser.parseWithRanges(updated);
+			const updated = this.insertByStrategy(
+				content,
+				section,
+				options.insertAt ?? "end"
+			);
+			await this.vault.modify(this.file, updated);
+			this._annotationMap = AnnotationParser.parseWithRanges(updated);
 
-		return true;
+			return true;
+		});
 	}
 
 	/** Update an existing annotation block by id */
@@ -83,78 +104,82 @@ export class AnnotationManager {
 		id: string,
 		patch: AnnotationUpdatePatch
 	): Promise<boolean> {
-		const content = await this.vault.read(this.file);
-		this._annotationMap = AnnotationParser.parseWithRanges(content);
-		const target = this._annotationMap.get(id);
-		if (!target) return false;
+		return this.withLock(async () => {
+			const content = await this.vault.read(this.file);
+			this._annotationMap = AnnotationParser.parseWithRanges(content);
+			const target = this._annotationMap.get(id);
+			if (!target) return false;
 
-		if (!patch.json) return false; // nothing to do
+			if (!patch.json) return false; // nothing to do
 
-		const replacement = this.buildAnnotationSection(patch.json, true);
+			const replacement = this.buildAnnotationSection(patch.json, true);
 
-		const updated =
-			content.slice(0, target.range.start) +
-			replacement +
-			content.slice(target.range.end);
+			const updated =
+				content.slice(0, target.range.start) +
+				replacement +
+				content.slice(target.range.end);
 
-		await this.vault.modify(this.file, updated);
-		this._annotationMap = AnnotationParser.parseWithRanges(content);
+			await this.vault.modify(this.file, updated);
+			this._annotationMap = AnnotationParser.parseWithRanges(updated);
 
-		return true;
+			return true;
+		});
 	}
 
 	/** Remove an annotation block by id */
 	async removeAnnotation(id: string): Promise<boolean> {
-		const content = await this.vault.read(this.file);
-		this._annotationMap = AnnotationParser.parseWithRanges(content);
+		return this.withLock(async () => {
+			const content = await this.vault.read(this.file);
+			this._annotationMap = AnnotationParser.parseWithRanges(content);
 
-		const target = this.annotationMap.get(id);
-		if (!target) return false;
+			const target = this.annotationMap.get(id);
+			if (!target) return false;
 
-		const NL = /\r\n/.test(content) ? "\r\n" : "\n";
-		// Set to 2 to leave one *blank line* between blocks
-		const MAX_NEWLINES_BETWEEN = 2;
+			const NL = /\r\n/.test(content) ? "\r\n" : "\n";
+			// Set to 2 to leave one *blank line* between blocks
+			const MAX_NEWLINES_BETWEEN = 2;
 
-		const before = content.slice(0, target.range.start);
-		const after = content.slice(target.range.end);
+			const before = content.slice(0, target.range.start);
+			const after = content.slice(target.range.end);
 
-		// Grab only *blank lines* at the join (whitespace + newline), not indentation before content.
-		const leftBlank = before.match(/(?:[ \t]*\r?\n[ \t]*)+$/)?.[0] ?? "";
-		const rightBlank = after.match(/^[ \t]*(?:\r?\n[ \t]*)+/)?.[0] ?? "";
+			// Grab only *blank lines* at the join (whitespace + newline), not indentation before content.
+			const leftBlank = before.match(/(?:[ \t]*\r?\n[ \t]*)+$/)?.[0] ?? "";
+			const rightBlank = after.match(/^[ \t]*(?:\r?\n[ \t]*)+/)?.[0] ?? "";
 
-		// Core text with boundary blanks stripped; also trim trailing spaces on the left side
-		const beforeCore = (
-			leftBlank
-				? before.slice(0, before.length - leftBlank.length)
-				: before
-		).replace(/[ \t]+$/g, "");
-		const afterCore = rightBlank ? after.slice(rightBlank.length) : after;
+			// Core text with boundary blanks stripped; also trim trailing spaces on the left side
+			const beforeCore = (
+				leftBlank
+					? before.slice(0, before.length - leftBlank.length)
+					: before
+			).replace(/[ \t]+$/g, "");
+			const afterCore = rightBlank ? after.slice(rightBlank.length) : after;
 
-		const hadBoundaryBreak = leftBlank.length > 0 || rightBlank.length > 0;
+			const hadBoundaryBreak = leftBlank.length > 0 || rightBlank.length > 0;
 
-		// Decide what to put between the cores
-		let join = "";
-		if (hadBoundaryBreak) {
-			join = NL.repeat(MAX_NEWLINES_BETWEEN);
-		} else {
-			// Inline deletion: avoid `Helloworld`
-			const leftChar = beforeCore.slice(-1);
-			const rightChar = afterCore.slice(0, 1);
-			if (
-				leftChar &&
-				rightChar &&
-				/\S/.test(leftChar) &&
-				/\S/.test(rightChar)
-			) {
-				join = " ";
+			// Decide what to put between the cores
+			let join = "";
+			if (hadBoundaryBreak) {
+				join = NL.repeat(MAX_NEWLINES_BETWEEN);
+			} else {
+				// Inline deletion: avoid `Helloworld`
+				const leftChar = beforeCore.slice(-1);
+				const rightChar = afterCore.slice(0, 1);
+				if (
+					leftChar &&
+					rightChar &&
+					/\S/.test(leftChar) &&
+					/\S/.test(rightChar)
+				) {
+					join = " ";
+				}
 			}
-		}
 
-		const newContent = beforeCore + join + afterCore;
+			const newContent = beforeCore + join + afterCore;
 
-		await this.vault.modify(this.file, newContent);
-		this._annotationMap = AnnotationParser.parseWithRanges(newContent);
-		return true;
+			await this.vault.modify(this.file, newContent);
+			this._annotationMap = AnnotationParser.parseWithRanges(newContent);
+			return true;
+		});
 	}
 	/** Validate all annotation blocks and return issues */
 	async validateFileAnnotations(): Promise<
@@ -165,8 +190,21 @@ export class AnnotationManager {
 			hint?: string;
 		}>
 	> {
-		const content = await this.vault.read(this.file);
-		return AnnotationParser.validateFileAnnotations(content);
+		return this.withLock(async () => {
+			const content = await this.vault.read(this.file);
+			return AnnotationParser.validateFileAnnotations(content);
+		});
+	}
+
+	/**
+	 * Refresh the annotation map from the current file content
+	 * This method is thread-safe and updates the internal map
+	 */
+	async refreshAnnotationMap(): Promise<void> {
+		return this.withLock(async () => {
+			const content = await this.vault.read(this.file);
+			this._annotationMap = AnnotationParser.parseWithRanges(content);
+		});
 	}
 
 	/** Add "> " prefix to each non-empty line. */
@@ -211,11 +249,8 @@ export class AnnotationManager {
 		// 	pieces.push("> ");
 		// }
 
-		const frontmatter = this.metadataCache.getFileCache(this.file)
-			?.frontmatter as Record<string, unknown> | undefined;
-
 		let sourceText = this.file.basename;
-		const source = (frontmatter?.["source"] as string).trim();
+		const source = (this.frontmatter?.["source"] as string).trim();
 		if (typeof source === "string") {
 			if (source.startsWith("http://") || source.startsWith("https://")) {
 				sourceText = source.split("/").pop() || source;
