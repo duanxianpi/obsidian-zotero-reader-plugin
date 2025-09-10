@@ -255,7 +255,8 @@ export class AnnotationManager {
 			if (source.startsWith("http://") || source.startsWith("https://")) {
 				sourceText = source.split("/").pop() || source;
 			} else {
-				sourceText = source;
+				const trimmedSource = source.trim().replace(/^\[\[|\]\]$/g, "");
+				sourceText = trimmedSource;
 			}
 		}
 

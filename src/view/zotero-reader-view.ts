@@ -208,7 +208,7 @@ export class ZoteroReaderView extends ItemView {
 
 			const source = this.fileFrontmatter?.["source"] as string;
 
-			const trimmedSource = source.trim().replace(/^\[\[|\]\]$/g, "");
+			let trimmedSource = source.trim();
 			let sourceType: "local" | "url" = "local";
 
 			if (
@@ -218,6 +218,7 @@ export class ZoteroReaderView extends ItemView {
 				sourceType = "url";
 			} else {
 				sourceType = "local";
+				trimmedSource = trimmedSource.replace(/^\[\[|\]\]$/g, "");
 			}
 
 			const extension = trimmedSource.split(".").pop();
@@ -472,7 +473,8 @@ export class ZoteroReaderView extends ItemView {
 						this.file.name
 					})`;
 				} else {
-					return `${source} (${this.file.name})`;
+					const trimmedSource = source.trim().replace(/^\[\[|\]\]$/g, "");
+					return `${trimmedSource} (${this.file.name})`;
 				}
 			}
 		}
