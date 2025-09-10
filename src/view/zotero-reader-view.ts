@@ -148,7 +148,11 @@ export class ZoteroReaderView extends ItemView {
 				});
 
 				this.bridge.onEventType("sidebarToggled", (evt) => {
-					console.log("Sidebar toggled:", evt.open);
+					this.handleSidebarToggled(evt.open);
+				});
+
+				this.bridge.onEventType("sidebarWidthChanged", (evt) => {
+					this.handleSidebarWidthChanged(evt.width);
 				});
 
 				this.bridge.onEventType("openLink", (evt) => {
@@ -248,23 +252,19 @@ export class ZoteroReaderView extends ItemView {
 			const secondaryViewState = this.fileFrontmatter?.[
 				"secondaryViewState"
 			] as Record<string, unknown> | undefined;
-			const lightTheme = this.fileFrontmatter?.[
-				"lightTheme"
-			] as string | undefined;
-			const darkTheme = this.fileFrontmatter?.[
-				"darkTheme"
-			] as string | undefined;
+			const extraOptions = this.fileFrontmatter?.["options"] as
+				| Partial<CreateReaderOptions>
+				| undefined;
 
 			const opts = {
 				...this.state.readerOptions,
 				colorScheme: this.colorScheme,
 				annotations: annotations,
-				sidebarOpen: false,
 				primaryViewState,
 				secondaryViewState,
 				customThemes: this.plugin.settings.readerThemes,
-				lightTheme: lightTheme,
-				darkTheme: darkTheme,
+				sidebarPosition: this.plugin.settings.sidebarPosition,
+				...extraOptions,
 			};
 
 			switch (sourceType) {
@@ -368,7 +368,13 @@ export class ZoteroReaderView extends ItemView {
 		if (!this.file) return;
 
 		await this.app.fileManager.processFrontMatter(this.file, (fm) => {
-			fm[key] = value;
+			if (
+				value === undefined ||
+				value === null ||
+				Object.keys(value || {}).length === 0
+			)
+				delete fm[key];
+			else fm[key] = value;
 		});
 
 		// Refresh the frontmatter cache after modification
@@ -384,6 +390,42 @@ export class ZoteroReaderView extends ItemView {
 				this.file!
 			)?.frontmatter as Record<string, unknown> | undefined;
 		}, 100);
+	}
+
+	private async updateOptionsInFrontmatter(options: Partial<CreateReaderOptions>) {
+		if (!this.file || !this.fileFrontmatter) return;
+
+		try {
+			const key = "options";
+			const currentOptions = (this.fileFrontmatter.options as Partial<CreateReaderOptions>) || {};
+			const newOptions = { ...currentOptions, ...options };
+			await this.updateFrontmatterProperty(key, newOptions);
+			this.fileFrontmatter.options = newOptions;
+		} catch (error) {
+			console.error("Error updating options in frontmatter:", error);
+		}
+	}
+
+	private async handleSidebarToggled(open: boolean) {
+		// Handle sidebar toggled event
+		if (!this.file || !this.fileFrontmatter) return;
+
+		try {
+			await this.updateOptionsInFrontmatter({ sidebarOpen: open });
+		} catch (error) {
+			console.error("Error updating sidebar state in frontmatter:", error);
+		}
+	}
+
+	private async handleSidebarWidthChanged(width: number) {
+		// Handle sidebar width changed event
+		if (!this.file || !this.fileFrontmatter) return;
+
+		try {
+			await this.updateOptionsInFrontmatter({ sidebarWidth: width });
+		} catch (error) {
+			console.error("Error updating sidebar width in frontmatter:", error);
+		}
 	}
 
 	private async handleAnnotationsSaved(annotations: ZoteroAnnotation[]) {
@@ -430,9 +472,7 @@ export class ZoteroReaderView extends ItemView {
 		if (!this.file || !this.fileFrontmatter) return;
 
 		try {
-			const key = "lightTheme";
-			await this.updateFrontmatterProperty(key, theme as Object);
-			this.fileFrontmatter.lightTheme = theme;
+			await this.updateOptionsInFrontmatter({ lightTheme: theme });
 		} catch (error) {
 			console.error("Error updating theme in frontmatter:", error);
 		}
@@ -443,9 +483,7 @@ export class ZoteroReaderView extends ItemView {
 		if (!this.file || !this.fileFrontmatter) return;
 
 		try {
-			const key = "darkTheme";
-			await this.updateFrontmatterProperty(key, theme as Object);
-			this.fileFrontmatter.darkTheme = theme;
+			await this.updateOptionsInFrontmatter({ darkTheme: theme });
 		} catch (error) {
 			console.error("Error updating theme in frontmatter:", error);
 		}
@@ -473,7 +511,9 @@ export class ZoteroReaderView extends ItemView {
 						this.file.name
 					})`;
 				} else {
-					const trimmedSource = source.trim().replace(/^\[\[|\]\]$/g, "");
+					const trimmedSource = source
+						.trim()
+						.replace(/^\[\[|\]\]$/g, "");
 					return `${trimmedSource} (${this.file.name})`;
 				}
 			}

@@ -7,6 +7,7 @@ export interface CreateReaderOptions {
 	data: { buf: Uint8Array } | { url: string };
 	type: string;
 	sidebarOpen?: boolean;
+	sidebarWidth?: number;
 	colorScheme: ColorScheme;
 	annotations: ZoteroAnnotation[];
 	primaryViewState?: Record<string, unknown>;
@@ -108,8 +109,6 @@ export interface ParsedAnnotation {
 	range: { start: number; end: number };
 	raw: string;
 }
-
-
 
 export interface CustomReaderTheme {
 	id: string;

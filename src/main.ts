@@ -29,13 +29,13 @@ import { ozrpAnnoCommentExtension } from "./editor/ozrpAnnoCommentExtension";
 import { CustomReaderTheme } from "./types/zotero-reader";
 
 interface ZoteroReaderPluginSettings {
-	mySetting: string;
 	readerThemes: CustomReaderTheme[];
+	sidebarPosition: "start" | "end";
 }
 
 const DEFAULT_SETTINGS: ZoteroReaderPluginSettings = {
-	mySetting: "default",
 	readerThemes: [],
+	sidebarPosition: "start",
 };
 
 const TOGGLE_ICON_CONTAINER_ID = "zotero-reader-toggle-container";
@@ -389,6 +389,20 @@ class SampleSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "My Plugin" });
+		containerEl.createEl("h2", { text: "Zotero Reader Plugin Settings" });
+
+		new Setting(containerEl)
+			.setName("Sidebar Position")
+			.setDesc("Set the default position of the sidebar in the reader view")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("start", "Start")
+					.addOption("end", "End")
+					.setValue(this.plugin.settings.sidebarPosition)
+					.onChange(async (value) => {
+						this.plugin.settings.sidebarPosition = value as "start" | "end";
+						await this.plugin.saveSettings();
+					})
+			);
 	}
 }
