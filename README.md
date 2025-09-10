@@ -38,7 +38,7 @@ zotero-reader: true
 source: path/to/file.pdf # or .epub / .html
 ---
 ```
-source also support link like `\[\[path/to/file\]\]`
+source also support link like `[[path/to/file]]`
 
 Then open the note and **click the icon in the top-right** to launch the reader.
 
