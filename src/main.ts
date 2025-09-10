@@ -26,13 +26,16 @@ import {
 } from "./view/zotero-reader-view";
 import { initializeBlobUrls } from "./bundle-assets/inline-assets";
 import { ozrpAnnoCommentExtension } from "./editor/ozrpAnnoCommentExtension";
+import { CustomReaderTheme } from "./types/zotero-reader";
 
 interface ZoteroReaderPluginSettings {
 	mySetting: string;
+	readerThemes: CustomReaderTheme[];
 }
 
 const DEFAULT_SETTINGS: ZoteroReaderPluginSettings = {
 	mySetting: "default",
+	readerThemes: [],
 };
 
 const TOGGLE_ICON_CONTAINER_ID = "zotero-reader-toggle-container";
@@ -92,8 +95,14 @@ export default class ZoteroReaderPlugin extends Plugin {
 			`<path style="scale: 5;" fill-rule="evenodd" clip-rule="evenodd" d="M3 3H17V17H3V3ZM1.75 1.75H3H17H18.25V3V17V18.25H17H3H1.75V17V3V1.75ZM16 16L11 4H9L4 16H6.16667L7.41667 13H12.5833L13.8333 16H16ZM10 6.8L8.04167 11.5H11.9583L10 6.8Z" fill="currentColor"/>`
 		);
 
-		addIcon("zotero-note", `<path style="scale: 5;" d="M9.375 17.625H17.625V2.375H2.375V10.625M9.375 17.625L2.375 10.625M9.375 17.625V10.625H2.375" stroke="currentColor" stroke-width="1.25" fill="transparent"/>`);
-		addIcon("zotero-text", `<path style="scale: 5;" fill-rule="evenodd" clip-rule="evenodd" d="M9 2H4V4H9V17H11V4H16V2H11H9Z" fill="currentColor"/>`);
+		addIcon(
+			"zotero-note",
+			`<path style="scale: 5;" d="M9.375 17.625H17.625V2.375H2.375V10.625M9.375 17.625L2.375 10.625M9.375 17.625V10.625H2.375" stroke="currentColor" stroke-width="1.25" fill="transparent"/>`
+		);
+		addIcon(
+			"zotero-text",
+			`<path style="scale: 5;" fill-rule="evenodd" clip-rule="evenodd" d="M9 2H4V4H9V17H11V4H16V2H11H9Z" fill="currentColor"/>`
+		);
 		addIcon(
 			"zotero-icon",
 			`
@@ -121,7 +130,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 
 		// Register the view
 		this.registerView(READER_VIEW_TYPE, (leaf) => {
-			const view = new ZoteroReaderView(leaf);
+			const view = new ZoteroReaderView(leaf, this);
 			return view;
 		});
 
@@ -305,9 +314,9 @@ export default class ZoteroReaderPlugin extends Plugin {
 				// Focus the existing view
 				this.app.workspace.setActiveLeaf(existingLeaf);
 				if (navigationInfo) {
-					(
-						existingLeaf.view as ZoteroReaderView
-					).readerNavigate(navigationInfo);
+					(existingLeaf.view as ZoteroReaderView).readerNavigate(
+						navigationInfo
+					);
 				}
 				return;
 			}
@@ -343,7 +352,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 	 */
 	private async createZoteroReaderView(
 		filePath: string,
-		navigationInfo: any = null,
+		navigationInfo: any = null
 	): Promise<void> {
 		// Create a new leaf (you can modify this to use existing leaf or create in specific location)
 		const leaf = this.app.workspace.getLeaf(true);
@@ -380,17 +389,6 @@ class SampleSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		new Setting(containerEl)
-			.setName("Setting #1")
-			.setDesc("It's a secret")
-			.addText((text) =>
-				text
-					.setPlaceholder("Enter your secret")
-					.setValue(this.plugin.settings.mySetting)
-					.onChange(async (value) => {
-						this.plugin.settings.mySetting = value;
-						await this.plugin.saveSettings();
-					})
-			);
+		containerEl.createEl("h2", { text: "My Plugin" });
 	}
 }

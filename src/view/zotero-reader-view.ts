@@ -16,6 +16,7 @@ import {
 	ZoteroAnnotation,
 } from "../types/zotero-reader";
 import { AnnotationManager } from "./annotation-manager";
+import ZoteroReaderPlugin from "src/main";
 
 export const VIEW_TYPE = "zotero-reader-view";
 
@@ -35,16 +36,18 @@ export class ZoteroReaderView extends ItemView {
 	private colorSchemeObserver?: MutationObserver;
 	private annotationManager?: AnnotationManager;
 	private colorScheme: ColorScheme;
+	private plugin: ZoteroReaderPlugin;
 
 	// State properties
 	private state: ReaderViewState;
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(leaf: WorkspaceLeaf, plugin: ZoteroReaderPlugin) {
 		super(leaf);
 		this.colorScheme =
 			(getComputedStyle(document.body).colorScheme as ColorScheme) ??
 			"dark";
 		this.icon = "zotero-icon";
+		this.plugin = plugin;
 	}
 
 	async setState(
@@ -165,6 +168,20 @@ export class ZoteroReaderView extends ItemView {
 
 				this.bridge.onEventType("viewStateChanged", (evt) => {
 					this.handleViewStateChanged(evt.state, evt.primary);
+					console.log("View state changed:", evt.primary, evt.state);
+				});
+
+				this.bridge.onEventType("saveCustomThemes", (evt) => {
+					console.log("Custom themes saved:", evt.customThemes);
+					this.handleCustomThemesSaved(evt.customThemes);
+				});
+
+				this.bridge.onEventType("setLightTheme", (evt) => {
+					this.handleSetLightTheme(evt.theme);
+				});
+
+				this.bridge.onEventType("setDarkTheme", (evt) => {
+					this.handleSetDarkTheme(evt.theme);
 				});
 
 				// Observe color scheme changes once and delegate to bridge
@@ -230,6 +247,12 @@ export class ZoteroReaderView extends ItemView {
 			const secondaryViewState = this.fileFrontmatter?.[
 				"secondaryViewState"
 			] as Record<string, unknown> | undefined;
+			const lightTheme = this.fileFrontmatter?.[
+				"lightTheme"
+			] as string | undefined;
+			const darkTheme = this.fileFrontmatter?.[
+				"darkTheme"
+			] as string | undefined;
 
 			const opts = {
 				...this.state.readerOptions,
@@ -238,6 +261,9 @@ export class ZoteroReaderView extends ItemView {
 				sidebarOpen: false,
 				primaryViewState,
 				secondaryViewState,
+				customThemes: this.plugin.settings.readerThemes,
+				lightTheme: lightTheme,
+				darkTheme: darkTheme,
 			};
 
 			switch (sourceType) {
@@ -388,6 +414,39 @@ export class ZoteroReaderView extends ItemView {
 
 		for (const id of annotationIds) {
 			await this.annotationManager.removeAnnotation(id);
+		}
+	}
+
+	private async handleCustomThemesSaved(customThemes: any) {
+		// Handle custom themes saved event
+		this.plugin.settings.readerThemes = customThemes;
+		await this.plugin.saveSettings();
+		console.log("Custom themes updated in plugin settings.");
+	}
+
+	private async handleSetLightTheme(theme: any) {
+		// Handle theme set event
+		if (!this.file || !this.fileFrontmatter) return;
+
+		try {
+			const key = "lightTheme";
+			await this.updateFrontmatterProperty(key, theme as Object);
+			this.fileFrontmatter.lightTheme = theme;
+		} catch (error) {
+			console.error("Error updating theme in frontmatter:", error);
+		}
+	}
+
+	private async handleSetDarkTheme(theme: any) {
+		// Handle theme set event
+		if (!this.file || !this.fileFrontmatter) return;
+
+		try {
+			const key = "darkTheme";
+			await this.updateFrontmatterProperty(key, theme as Object);
+			this.fileFrontmatter.darkTheme = theme;
+		} catch (error) {
+			console.error("Error updating theme in frontmatter:", error);
 		}
 	}
 

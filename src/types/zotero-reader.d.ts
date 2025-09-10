@@ -11,6 +11,9 @@ export interface CreateReaderOptions {
 	annotations: ZoteroAnnotation[];
 	primaryViewState?: Record<string, unknown>;
 	secondaryViewState?: Record<string, unknown>;
+	customThemes?: CustomReaderTheme[];
+	lightTheme?: string;
+	darkTheme?: string;
 }
 
 export type ChildEvents =
@@ -46,7 +49,9 @@ export type ChildEvents =
 	| { type: "deletePages"; pageIndexes: unknown; degrees: unknown }
 	| { type: "toggleContextPane" }
 	| { type: "textSelectionAnnotationModeChanged"; mode: unknown }
-	| { type: "saveCustomThemes"; customThemes: unknown };
+	| { type: "saveCustomThemes"; customThemes: unknown }
+	| { type: "setLightTheme"; theme: unknown }
+	| { type: "setDarkTheme"; theme: unknown };
 
 export type ParentApi = {
 	// child → parent
@@ -102,4 +107,13 @@ export interface ParsedAnnotation {
 	json: ZoteroAnnotation; // raw JSON object (parsed)
 	range: { start: number; end: number };
 	raw: string;
+}
+
+
+
+export interface CustomReaderTheme {
+	id: string;
+	label: string;
+	background: string;
+	foreground: string;
 }
