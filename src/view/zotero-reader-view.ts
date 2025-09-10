@@ -208,7 +208,7 @@ export class ZoteroReaderView extends ItemView {
 
 			const source = this.fileFrontmatter?.["source"] as string;
 
-			const trimmedSource = source.trim();
+			const trimmedSource = source.trim().replace(/^\[\[|\]\]$/g, "");
 			let sourceType: "local" | "url" = "local";
 
 			if (
