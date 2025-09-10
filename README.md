@@ -89,7 +89,7 @@ npm run dev:plugin
 ---
 ## Acknowledgments
 
-Special thanks to the [Zotero](https://github.com/zotero/zotero) team for the excellent Reader that inspired this plugin.
+Special thanks to the [Zotero](https://github.com/zotero) team for the excellent application that inspired this plugin.
 
 ---
 
@@ -114,5 +114,8 @@ Thanks for checking out the plugin! I’m currently a student and working on thi
 ## Roadmap / Feedback
 
 Have ideas or found a bug? Please join the discord server!
-
 <a href="https://discord.gg/KwTkAhVc"> <img alt="Join our Discord" src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white&style=for-the-badge"> </a>
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=duanxianpi/obsidian-zotero-reader-plugin&type=Date)](https://www.star-history.com/#duanxianpi/obsidian-zotero-reader-plugin&Date)
