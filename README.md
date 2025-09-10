@@ -30,7 +30,7 @@ Read and annotate PDFs/EPUB/HTML inside Obsidian with awesome Zotero Reader! Thi
 
 ## Usage
 1. Create a new md file
-2. Add the following YAML frontmatter to the Markdown file. The `source` can point to a local/network `pdf`, `epub`, or `html` file.
+2. Add the following YAML frontmatter to the Markdown file. The `source` can point to a local `pdf`, `epub`, or `html` file inside Obsidian or network file.
 
 ```yaml
 ---
