@@ -371,7 +371,7 @@ export class ZoteroReaderView extends ItemView {
 			if (
 				value === undefined ||
 				value === null ||
-				Object.keys(value || {}).length === 0
+				(typeof value === 'object' && value !== null && Object.keys(value).length === 0)
 			)
 				delete fm[key];
 			else fm[key] = value;
