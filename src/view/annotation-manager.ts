@@ -6,7 +6,13 @@
  * for working with annotation blocks in markdown files.
  */
 
-import { TFile, Vault, MetadataCache } from "obsidian";
+import {
+	TFile,
+	Vault,
+	MetadataCache,
+	getFrontMatterInfo,
+	parseYaml,
+} from "obsidian";
 import { AnnotationParser, OzrpAnnoMarks } from "../parser/annotation-parser";
 import { ParsedAnnotation, ZoteroAnnotation } from "../types/zotero-reader";
 import * as nunjucks from "nunjucks";
@@ -34,7 +40,7 @@ const ANNOTATION_COLORS = new Map<string, string>([
 export class AnnotationManager {
 	private file: TFile;
 	private vault: Vault;
-	private frontmatter: Record<string, unknown>;
+	private source: string;
 	private _annotationMap: Map<string, ParsedAnnotation>;
 	private _operationLock: Promise<void> = Promise.resolve();
 	private nunjucksEnv: nunjucks.Environment;
@@ -43,16 +49,17 @@ export class AnnotationManager {
 	public get annotationMap(): Map<string, ParsedAnnotation> {
 		return this._annotationMap;
 	}
-	constructor(
+
+	private constructor(
 		vault: Vault,
 		file: TFile,
-		frontmatter: Record<string, unknown>,
 		content: string,
+		source: string,
 		customAnnotationTemplate?: string
 	) {
 		this.file = file;
 		this.vault = vault;
-		this.frontmatter = frontmatter;
+		this.source = source;
 		this._annotationMap = AnnotationParser.parseWithRanges(content);
 		this.customAnnotationTemplate = customAnnotationTemplate;
 
@@ -60,6 +67,34 @@ export class AnnotationManager {
 		this.nunjucksEnv = new nunjucks.Environment(undefined, {
 			autoescape: false,
 		});
+	}
+
+	/**
+	 * Create a new AnnotationManager
+	 */
+	static async create(
+		vault: Vault,
+		file: TFile,
+		customAnnotationTemplate?: string
+	): Promise<AnnotationManager> {
+		const content = await vault.read(file);
+		const info = getFrontMatterInfo(content);
+
+		// turn the YAML string into a JS object
+		const fileFrontmatter = parseYaml(info.frontmatter) as Record<
+			string,
+			unknown
+		>;
+
+		const source = (fileFrontmatter["source"] as string) || file.basename;
+
+		return new AnnotationManager(
+			vault,
+			file,
+			content,
+			source,
+			customAnnotationTemplate
+		);
 	}
 
 	/**
@@ -221,12 +256,10 @@ export class AnnotationManager {
 	private buildAnnotationSection(json: ZoteroAnnotation): string {
 		// Prepare source text
 		let sourceText = this.file.basename;
-		const source = this.frontmatter?.["source"] as string;
-		if (typeof source === "string" && source.trim()) {
-			const trimmedSource = source.trim();
-			sourceText = trimmedSource.replace(/^\[\[|\]\]$/g, "");
-			sourceText = sourceText.split("/").pop() || sourceText;
-		}
+
+		const trimmedSource = this.source.trim();
+		sourceText = trimmedSource.replace(/^\[\[|\]\]$/g, "");
+		sourceText = sourceText.split("/").pop() || sourceText;
 
 		// Prepare template data
 		const pageLabel = json.pageLabel || "";

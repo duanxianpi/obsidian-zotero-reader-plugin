@@ -83,11 +83,9 @@ export class ZoteroReaderView extends ItemView {
 		}
 
 		// Initialize annotation manager
-		this.annotationManager = new AnnotationManager(
+		this.annotationManager = await AnnotationManager.create(
 			this.app.vault,
 			this.file,
-			this.fileFrontmatter,
-			content,
 			this.plugin.settings.annotationBlockTemplate
 		);
 

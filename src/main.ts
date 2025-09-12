@@ -318,15 +318,11 @@ export default class ZoteroReaderPlugin extends Plugin {
 	 */
 	private async updateFileAnnotationsToLatestTemplate(file: TFile): Promise<void> {
 		try {
-			const content = await this.app.vault.read(file);
-			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined || {};
 			
-			// Create annotation manager instance
-			const annotationManager = new AnnotationManager(
+			// Create annotation manager instance - it will read the file content internally
+			const annotationManager = await AnnotationManager.create(
 				this.app.vault,
 				file,
-				frontmatter,
-				content,
 				this.settings.annotationBlockTemplate
 			);
 			
@@ -373,13 +369,10 @@ export default class ZoteroReaderPlugin extends Plugin {
 						continue;
 					}
 
-					const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined || {};
 					
-					const annotationManager = new AnnotationManager(
+					const annotationManager = await AnnotationManager.create(
 						this.app.vault,
 						file,
-						frontmatter,
-						content,
 						this.settings.annotationBlockTemplate
 					);
 					
