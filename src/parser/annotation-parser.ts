@@ -8,18 +8,14 @@ export const OzrpAnnoMarks = {
 	Q_END: "%% OZRP-ANNO-QUOTE-END %%",
 	C_BEGIN: "%% OZRP-ANNO-COMM-BEGIN %%",
 	C_END: "%% OZRP-ANNO-COMM-END %%",
+	BLOCKS_BEGIN: "%% OZRP-ANNO-BLOCKS-BEGIN %%",
+	BLOCKS_END: "%% OZRP-ANNO-BLOCKS-END %%",
 } as const;
 
 /**
  * We match entire sections including markers, capturing the inner body for parsing.
  * Leading blockquote/space prefixes are tolerated and normalized out during parsing.
  */
-// const SECTION_WITH_MARKERS_RE = new RegExp(
-// 	String.raw`(^[>\t ]*%%\s*OZRP-ANNO-BEGIN\s*%%[\t ]*(?:\r?\n))` + // group 1: begin line (with trailing NL)
-// 		String.raw`([\s\S]*?)` + // group 2: inner body (non-greedy)
-// 		String.raw`(?=^[>\t ]*%%\s*OZRP-ANNO-END\s*%%[\t ]*$)`, // lookahead up to END line
-// 	"gm"
-// );
 
 const SECTION_WITH_MARKERS_RE = new RegExp(
 	String.raw`(%%\s*OZRP-ANNO-BEGIN` + // group 1: begin line (with trailing NL)

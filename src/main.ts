@@ -24,6 +24,7 @@ import {
 	ZoteroReaderView,
 	VIEW_TYPE as READER_VIEW_TYPE,
 } from "./view/zotero-reader-view";
+import { AnnotationManager } from "./view/annotation-manager";
 import { initializeBlobUrls } from "./bundle-assets/inline-assets";
 import { ozrpAnnoCommentExtension } from "./editor/ozrpAnnoCommentExtension";
 import { CustomReaderTheme } from "./types/zotero-reader";
@@ -31,11 +32,27 @@ import { CustomReaderTheme } from "./types/zotero-reader";
 interface ZoteroReaderPluginSettings {
 	readerThemes: CustomReaderTheme[];
 	sidebarPosition: "start" | "end";
+	annotationBlockTemplate: string;
 }
 
-const DEFAULT_SETTINGS: ZoteroReaderPluginSettings = {
+export const DEFAULT_SETTINGS: ZoteroReaderPluginSettings = {
 	readerThemes: [],
 	sidebarPosition: "start",
+	annotationBlockTemplate: `{{ beginMarker }}
+> [!ozrp-{{ type }}-{{ color }}] [{{ displayText }}](obsidian://zotero-reader?file={{ encodedFilePath }}&navigation={{ navLink }})
+> {{ quoteBeginMarker }}
+> > {{ quote }}
+> {{ quoteEndMarker }}
+> 
+{%- if comment.trim() %}
+> {{ commentBeginMarker }} 
+> {{ comment }}
+> {{ commentEndMarker }} ^{{ id }}
+{%- else %}
+> {{ commentBeginMarker }} {{ commentEndMarker }} ^{{ id }}
+{%- endif %}
+
+{{ endMarker }}`,
 };
 
 const TOGGLE_ICON_CONTAINER_ID = "zotero-reader-toggle-container";
@@ -158,6 +175,31 @@ export default class ZoteroReaderPlugin extends Plugin {
 			this.handleProtocolCall.bind(this)
 		);
 
+		// Add command to update file's annotations to latest template
+		this.addCommand({
+			id: "update-file-annotations-template",
+			name: "Update file's annotations to latest template",
+			checkCallback: (checking: boolean) => {
+				const activeFile = this.app.workspace.getActiveFile();
+				if (activeFile && activeFile.extension === 'md') {
+					if (!checking) {
+						this.updateFileAnnotationsToLatestTemplate(activeFile);
+					}
+					return true;
+				}
+				return false;
+			}
+		});
+
+		// Add command to update all annotations in vault to latest template
+		this.addCommand({
+			id: "update-all-annotations-template",
+			name: "Update ALL annotations in vault to latest template",
+			callback: () => {
+				this.updateAllAnnotationsToLatestTemplate();
+			}
+		});
+
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
 	}
@@ -269,6 +311,112 @@ export default class ZoteroReaderPlugin extends Plugin {
 				active: true,
 			});
 		});
+	}
+
+	/**
+	 * Update all annotations in a file to use the latest template
+	 */
+	private async updateFileAnnotationsToLatestTemplate(file: TFile): Promise<void> {
+		try {
+			const content = await this.app.vault.read(file);
+			const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined || {};
+			
+			// Create annotation manager instance
+			const annotationManager = new AnnotationManager(
+				this.app.vault,
+				file,
+				frontmatter,
+				content,
+				this.settings.annotationBlockTemplate
+			);
+			
+			const annotations = annotationManager.annotationMap;
+			
+			if (annotations.size === 0) {
+				new Notice("No annotations found in this file");
+				return;
+			}
+			
+			// Update each annotation with its current JSON data to regenerate with new template
+			const updatedCount = await annotationManager.updateAllAnnotationsToLatestTemplate();
+
+			if (updatedCount > 0) {
+				new Notice(`Updated ${updatedCount} annotation${updatedCount > 1 ? 's' : ''} to latest template`);
+			} else {
+				new Notice("No annotations were updated");
+			}
+			
+		} catch (error) {
+			console.error("Error updating annotations to latest template:", error);
+			new Notice("Failed to update annotations. Check console for details.");
+		}
+	}
+
+	/**
+	 * Update all annotations in the entire vault to use the latest template
+	 */
+	private async updateAllAnnotationsToLatestTemplate(): Promise<void> {
+		try {
+			const files = this.app.vault.getMarkdownFiles();
+			let totalUpdated = 0;
+			let filesProcessed = 0;
+			let filesWithAnnotations = 0;
+
+			new Notice("Scanning vault for annotations...", 2000);
+
+			for (const file of files) {
+				try {
+					const content = await this.app.vault.read(file);
+					
+					// Quick check if file contains annotation markers before creating manager
+					if (!content.includes("OZRP-ANNO-BEGIN")) {
+						continue;
+					}
+
+					const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter as Record<string, unknown> | undefined || {};
+					
+					const annotationManager = new AnnotationManager(
+						this.app.vault,
+						file,
+						frontmatter,
+						content,
+						this.settings.annotationBlockTemplate
+					);
+					
+					const annotations = annotationManager.annotationMap;
+					
+					if (annotations.size === 0) {
+						continue;
+					}
+
+					filesWithAnnotations++;
+					let fileUpdatedCount = 0;
+					
+					const updatedCount = await annotationManager.updateAllAnnotationsToLatestTemplate();
+					fileUpdatedCount ++;
+					totalUpdated += updatedCount;
+					
+					if (fileUpdatedCount > 0) {
+						console.log(`Updated ${fileUpdatedCount} annotations in ${file.path}`);
+					}
+					
+					filesProcessed++;
+					
+				} catch (error) {
+					console.error(`Error processing file ${file.path}:`, error);
+				}
+			}
+
+			if (totalUpdated > 0) {
+				new Notice(`Updated ${totalUpdated} annotations across ${filesWithAnnotations} files`);
+			} else {
+				new Notice("No annotations found in vault or all annotations were already up to date");
+			}
+			
+		} catch (error) {
+			console.error("Error updating all annotations to latest template:", error);
+			new Notice("Failed to update annotations. Check console for details.");
+		}
 	}
 
 	async loadSettings() {
@@ -393,16 +541,56 @@ class SampleSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Sidebar Position")
-			.setDesc("Set the default position of the sidebar in the reader view")
+			.setDesc(
+				"Set the default position of the sidebar in the reader view"
+			)
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOption("start", "Start")
 					.addOption("end", "End")
 					.setValue(this.plugin.settings.sidebarPosition)
 					.onChange(async (value) => {
-						this.plugin.settings.sidebarPosition = value as "start" | "end";
+						this.plugin.settings.sidebarPosition = value as
+							| "start"
+							| "end";
 						await this.plugin.saveSettings();
 					})
 			);
+
+		const annotationTemplateSetting = new Setting(containerEl)
+			.setName("Annotation Block Template")
+			.setDesc(
+				"Customize the template used for annotation blocks. You can use Nunjucks templating. See the documentation for available variables."
+			)
+			.addTextArea((text) => {
+				text.setPlaceholder("Enter your custom annotation template...")
+					.setValue(this.plugin.settings.annotationBlockTemplate)
+					.onChange(async (value) => {
+						this.plugin.settings.annotationBlockTemplate = value;
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.rows = 20;
+				text.inputEl.wrap = "off";
+				text.inputEl.style.width = "100%";
+				text.inputEl.style.fontFamily = "monospace";
+				text.inputEl.style.resize = "vertical";
+			})
+			.addButton((button) => {
+				button
+					.setButtonText("Reset to Default")
+					.setTooltip("Reset the annotation template to the default")
+					.onClick(async () => {
+						this.plugin.settings.annotationBlockTemplate =
+							DEFAULT_SETTINGS.annotationBlockTemplate;
+						await this.plugin.saveSettings();
+						this.display(); // Refresh the settings display
+					});
+			});
+
+		annotationTemplateSetting.settingEl.style.flexDirection = "column";
+		annotationTemplateSetting.settingEl.style.alignItems = "flex-start";
+		annotationTemplateSetting.controlEl.style.flexDirection = "column";
+		annotationTemplateSetting.controlEl.style.width = "100%";
+		annotationTemplateSetting.controlEl.style.alignItems = "flex-end";
 	}
 }

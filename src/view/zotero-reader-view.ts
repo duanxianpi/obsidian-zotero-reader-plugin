@@ -87,7 +87,8 @@ export class ZoteroReaderView extends ItemView {
 			this.app.vault,
 			this.file,
 			this.fileFrontmatter,
-			content
+			content,
+			this.plugin.settings.annotationBlockTemplate
 		);
 
 		// Reload view
@@ -371,7 +372,9 @@ export class ZoteroReaderView extends ItemView {
 			if (
 				value === undefined ||
 				value === null ||
-				(typeof value === 'object' && value !== null && Object.keys(value).length === 0)
+				(typeof value === "object" &&
+					value !== null &&
+					Object.keys(value).length === 0)
 			)
 				delete fm[key];
 			else fm[key] = value;
@@ -400,12 +403,16 @@ export class ZoteroReaderView extends ItemView {
 		}, 100);
 	}
 
-	private async updateOptionsInFrontmatter(options: Partial<CreateReaderOptions>) {
+	private async updateOptionsInFrontmatter(
+		options: Partial<CreateReaderOptions>
+	) {
 		if (!this.file || !this.fileFrontmatter) return;
 
 		try {
 			const key = "options";
-			const currentOptions = (this.fileFrontmatter.options as Partial<CreateReaderOptions>) || {};
+			const currentOptions =
+				(this.fileFrontmatter
+					.options as Partial<CreateReaderOptions>) || {};
 			const newOptions = { ...currentOptions, ...options };
 			await this.updateFrontmatterProperty(key, newOptions);
 			this.fileFrontmatter.options = newOptions;
@@ -421,7 +428,10 @@ export class ZoteroReaderView extends ItemView {
 		try {
 			await this.updateOptionsInFrontmatter({ sidebarOpen: open });
 		} catch (error) {
-			console.error("Error updating sidebar state in frontmatter:", error);
+			console.error(
+				"Error updating sidebar state in frontmatter:",
+				error
+			);
 		}
 	}
 
@@ -432,7 +442,10 @@ export class ZoteroReaderView extends ItemView {
 		try {
 			await this.updateOptionsInFrontmatter({ sidebarWidth: width });
 		} catch (error) {
-			console.error("Error updating sidebar width in frontmatter:", error);
+			console.error(
+				"Error updating sidebar width in frontmatter:",
+				error
+			);
 		}
 	}
 
@@ -511,19 +524,11 @@ export class ZoteroReaderView extends ItemView {
 		) {
 			const source = (this.fileFrontmatter["source"] as string).trim();
 			if (typeof source === "string") {
-				if (
-					source.startsWith("http://") ||
-					source.startsWith("https://")
-				) {
-					return `${source.split("/").pop() || source} (${
-						this.file.name
-					})`;
-				} else {
-					const trimmedSource = source
-						.trim()
-						.replace(/^\[\[|\]\]$/g, "");
-					return `${trimmedSource} (${this.file.name})`;
-				}
+				const trimmedSource = source.trim().replace(/^\[\[|\]\]$/g, "");
+				const sourceText =
+					trimmedSource.split("/").pop() || trimmedSource;
+
+				return `${sourceText} (${this.file.name})`;
 			}
 		}
 		return "Zotero Reader";

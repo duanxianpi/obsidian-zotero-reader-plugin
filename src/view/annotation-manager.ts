@@ -9,10 +9,11 @@
 import { TFile, Vault, MetadataCache } from "obsidian";
 import { AnnotationParser, OzrpAnnoMarks } from "../parser/annotation-parser";
 import { ParsedAnnotation, ZoteroAnnotation } from "../types/zotero-reader";
-
+import * as nunjucks from "nunjucks";
+import { DEFAULT_SETTINGS } from "../main";
 
 export interface AnnotationInsertOptions {
-	insertAt?: "beginning" | "end" | "after-frontmatter"; // default: end
+	insertAt?: "annotation-blocks" | "end"; // default: end
 }
 
 export interface AnnotationUpdatePatch {
@@ -30,16 +31,14 @@ const ANNOTATION_COLORS = new Map<string, string>([
 	["#aaaaaa", "gray"],
 ]);
 
-/** Tools */
-const NL = "\n";
-const ensureTrailingNL = (s: string) => (s.endsWith("\n") ? s : s + "\n");
-
 export class AnnotationManager {
 	private file: TFile;
 	private vault: Vault;
 	private frontmatter: Record<string, unknown>;
 	private _annotationMap: Map<string, ParsedAnnotation>;
 	private _operationLock: Promise<void> = Promise.resolve();
+	private nunjucksEnv: nunjucks.Environment;
+	private customAnnotationTemplate?: string;
 
 	public get annotationMap(): Map<string, ParsedAnnotation> {
 		return this._annotationMap;
@@ -49,11 +48,33 @@ export class AnnotationManager {
 		file: TFile,
 		frontmatter: Record<string, unknown>,
 		content: string,
+		customAnnotationTemplate?: string
 	) {
 		this.file = file;
 		this.vault = vault;
 		this.frontmatter = frontmatter;
 		this._annotationMap = AnnotationParser.parseWithRanges(content);
+		this.customAnnotationTemplate = customAnnotationTemplate;
+
+		// Configure Nunjucks environment for string templates
+		this.nunjucksEnv = new nunjucks.Environment(undefined, {
+			autoescape: false,
+		});
+	}
+
+	/**
+	 * Get the annotation block template
+	 */
+	private getAnnotationBlockTemplate(): string {
+		if (
+			this.customAnnotationTemplate &&
+			this.customAnnotationTemplate.trim()
+		) {
+			return this.customAnnotationTemplate;
+		}
+
+		// Default template
+		return DEFAULT_SETTINGS.annotationBlockTemplate;
 	}
 
 	/**
@@ -62,7 +83,7 @@ export class AnnotationManager {
 	private async withLock<T>(operation: () => Promise<T>): Promise<T> {
 		const currentLock = this._operationLock;
 		let resolveLock: () => void;
-		this._operationLock = new Promise(resolve => {
+		this._operationLock = new Promise((resolve) => {
 			resolveLock = resolve;
 		});
 
@@ -90,7 +111,7 @@ export class AnnotationManager {
 			const updated = this.insertByStrategy(
 				content,
 				section,
-				options.insertAt ?? "end"
+				options.insertAt ?? "annotation-blocks"
 			);
 			await this.vault.modify(this.file, updated);
 			this._annotationMap = AnnotationParser.parseWithRanges(updated);
@@ -107,12 +128,12 @@ export class AnnotationManager {
 		return this.withLock(async () => {
 			const content = await this.vault.read(this.file);
 			this._annotationMap = AnnotationParser.parseWithRanges(content);
-			const target = this._annotationMap.get(id);
+			const target = this.annotationMap.get(id);
 			if (!target) return false;
 
 			if (!patch.json) return false; // nothing to do
 
-			const replacement = this.buildAnnotationSection(patch.json, true);
+			const replacement = this.buildAnnotationSection(patch.json);
 
 			const updated =
 				content.slice(0, target.range.start) +
@@ -126,6 +147,27 @@ export class AnnotationManager {
 		});
 	}
 
+	/** Update all annotations to the latest template */
+	async updateAllAnnotationsToLatestTemplate(): Promise<number> {
+		const content = await this.vault.read(this.file);
+		this._annotationMap = AnnotationParser.parseWithRanges(content);
+		const annotations = this.annotationMap;
+		let updatedCount = 0;
+		for (const [id, annotation] of annotations.entries()) {
+			const success = await this.updateAnnotation(id, {
+				json: {
+					...annotation.json,
+					text: annotation.text,
+					comment: annotation.comment,
+				},
+			});
+			if (success) {
+				updatedCount++;
+			}
+		}
+		return updatedCount;
+	}
+
 	/** Remove an annotation block by id */
 	async removeAnnotation(id: string): Promise<boolean> {
 		return this.withLock(async () => {
@@ -135,46 +177,14 @@ export class AnnotationManager {
 			const target = this.annotationMap.get(id);
 			if (!target) return false;
 
-			const NL = /\r\n/.test(content) ? "\r\n" : "\n";
-			// Set to 2 to leave one *blank line* between blocks
-			const MAX_NEWLINES_BETWEEN = 2;
-
-			const before = content.slice(0, target.range.start);
+			const before = content.slice(0, target.range.start - 1);
 			const after = content.slice(target.range.end);
 
-			// Grab only *blank lines* at the join (whitespace + newline), not indentation before content.
-			const leftBlank = before.match(/(?:[ \t]*\r?\n[ \t]*)+$/)?.[0] ?? "";
-			const rightBlank = after.match(/^[ \t]*(?:\r?\n[ \t]*)+/)?.[0] ?? "";
+			// Remove extra leading newlines to avoid excessive blank lines
+			const beforeTrimmed = before.replace(/(\r?\n)+$/g, "\n");
+			const afterTrimmed = after.replace(/^(\r?\n)+/g, "\n");
 
-			// Core text with boundary blanks stripped; also trim trailing spaces on the left side
-			const beforeCore = (
-				leftBlank
-					? before.slice(0, before.length - leftBlank.length)
-					: before
-			).replace(/[ \t]+$/g, "");
-			const afterCore = rightBlank ? after.slice(rightBlank.length) : after;
-
-			const hadBoundaryBreak = leftBlank.length > 0 || rightBlank.length > 0;
-
-			// Decide what to put between the cores
-			let join = "";
-			if (hadBoundaryBreak) {
-				join = NL.repeat(MAX_NEWLINES_BETWEEN);
-			} else {
-				// Inline deletion: avoid `Helloworld`
-				const leftChar = beforeCore.slice(-1);
-				const rightChar = afterCore.slice(0, 1);
-				if (
-					leftChar &&
-					rightChar &&
-					/\S/.test(leftChar) &&
-					/\S/.test(rightChar)
-				) {
-					join = " ";
-				}
-			}
-
-			const newContent = beforeCore + join + afterCore;
+			const newContent = beforeTrimmed + afterTrimmed;
 
 			await this.vault.modify(this.file, newContent);
 			this._annotationMap = AnnotationParser.parseWithRanges(newContent);
@@ -207,101 +217,50 @@ export class AnnotationManager {
 		});
 	}
 
-	/** Add "> " prefix to each non-empty line. */
-	private asBlockquote(text: string): string {
-		return text
-			.replace(/\s+$/, "")
-			.split(/\r?\n/)
-			.map((l) => (l.length ? "> " + l : ">"))
-			.join("\n");
-	}
-
-	/** Add "> " prefix to each non-empty line.
-	 *  For quote blocks, use "> > " for the first line.
-	 */
-	private asQuoteBlockquote(text: string): string {
-		return text
-			.replace(/\s+$/, "")
-			.split(/\r?\n/)
-			.map((l, idx) =>
-				l.length ? (idx === 0 ? "> > " : "> ") + l : "> >"
-			)
-			.join("\n");
-	}
-
 	/** Build a canonical annotation section string (BEGIN..END) */
-	private buildAnnotationSection(
-		json: ZoteroAnnotation,
-		isReplacementSection = false
-	): string {
-		const pieces: string[] = [];
-
-		// Remove the text and comment inside json for serialization
-		pieces.push(
-			OzrpAnnoMarks.BEGIN.replace(
-				"{json}",
-				JSON.stringify({ ...json, text: "", comment: "" })
-			)
-		);
-
-		// if (header && header.trim()) {
-		// 	pieces.push(this.asBlockquote(header.trim()));
-		// 	pieces.push("> ");
-		// }
-
+	private buildAnnotationSection(json: ZoteroAnnotation): string {
+		// Prepare source text
 		let sourceText = this.file.basename;
-		const source = (this.frontmatter?.["source"] as string).trim();
-		if (typeof source === "string") {
-			if (source.startsWith("http://") || source.startsWith("https://")) {
-				sourceText = source.split("/").pop() || source;
-			} else {
-				const trimmedSource = source.trim().replace(/^\[\[|\]\]$/g, "");
-				sourceText = trimmedSource;
-			}
+		const source = this.frontmatter?.["source"] as string;
+		if (typeof source === "string" && source.trim()) {
+			const trimmedSource = source.trim();
+			sourceText = trimmedSource.replace(/^\[\[|\]\]$/g, "");
+			sourceText = sourceText.split("/").pop() || sourceText;
 		}
 
+		// Prepare template data
 		const pageLabel = json.pageLabel || "";
 		const displayText =
 			sourceText + (pageLabel ? `, page ${pageLabel}` : "");
 		const color = ANNOTATION_COLORS.get(json.color) || "yellow";
-
 		const navLink = encodeURIComponent(
 			JSON.stringify({ annotationID: json.id })
 		);
-		const header = `[!ozrp-${
-			json.type
-		}-${color}] [${displayText}](obsidian://zotero-reader?file=${encodeURIComponent(
-			this.file.path
-		)}&navigation=${navLink})`;
 
-		pieces.push(this.asBlockquote(header));
+		// Template context
+		const templateContext = {
+			beginMarker: OzrpAnnoMarks.BEGIN.replace(
+				"{json}",
+				JSON.stringify({ ...json, text: "", comment: "" })
+			),
+			endMarker: OzrpAnnoMarks.END,
+			quoteBeginMarker: OzrpAnnoMarks.Q_BEGIN,
+			quoteEndMarker: OzrpAnnoMarks.Q_END,
+			commentBeginMarker: OzrpAnnoMarks.C_BEGIN,
+			commentEndMarker: OzrpAnnoMarks.C_END,
+			type: json.type,
+			color,
+			displayText,
+			encodedFilePath: encodeURIComponent(this.file.path),
+			navLink,
+			quote: json.text || "",
+			comment: json.comment || "",
+			id: json.id,
+		};
 
-		// Quote
-		pieces.push("> " + OzrpAnnoMarks.Q_BEGIN);
-		const q = ensureTrailingNL(json.text || "");
-		pieces.push(this.asQuoteBlockquote(q));
-		pieces.push("> " + OzrpAnnoMarks.Q_END);
-		pieces.push("> ");
-
-		// Comment (optional but we always include the block for stability)
-		const comment = json.comment || "";
-		// pieces.push("> " + OzrpAnnoMarks.C_BEGIN);
-		if (comment.trim() === "") {
-			pieces.push(this.asBlockquote(`${OzrpAnnoMarks.C_BEGIN} ${OzrpAnnoMarks.C_END} ^${json.id}`));
-		} else {
-			pieces.push(
-				this.asBlockquote(
-					ensureTrailingNL(`${OzrpAnnoMarks.C_BEGIN} ${comment}`)
-				)
-			);
-			pieces.push("> " + OzrpAnnoMarks.C_END + ` ^${json.id}`);
-		}
-		pieces.push("");
-
-		pieces.push(OzrpAnnoMarks.END);
-
-		// We only add new lines for non-replacement sections
-		return pieces.join(NL) + (isReplacementSection ? "" : NL);
+		// Render using Nunjucks
+		const template = this.getAnnotationBlockTemplate();
+		return this.nunjucksEnv.renderString(template, templateContext).trim();
 	}
 
 	/** Internal: choose insertion point strategy */
@@ -311,61 +270,35 @@ export class AnnotationManager {
 		where: NonNullable<AnnotationInsertOptions["insertAt"]>
 	): string {
 		switch (where) {
-			case "beginning":
-				return (
-					section +
-					(content.startsWith("\n")
-						? content
-						: content
-						? "\n" + content
-						: "")
-				);
-			case "after-frontmatter":
-				return this.insertAfterFrontmatter(content, section);
+			case "annotation-blocks":
+				return this.insertInAnnotationBlocks(content, section);
 			case "end":
 			default: {
-				const needsGap = content.length > 0 && !content.endsWith("\n");
-				const sep =
-					content.length === 0 ? "" : needsGap ? "\n\n" : "\n";
-				return content + sep + section;
+				const contentTrimmed = content.replace(/(\r?\n)+$/g, "");
+				return contentTrimmed + "\n\n" + section;
 			}
 		}
 	}
 
-	/** Insert a section immediately after YAML frontmatter if present; else at top */
-	private insertAfterFrontmatter(content: string, section: string): string {
-		const fm = this.getFrontmatterRange(content);
-		if (!fm) {
-			return (
-				section +
-				(content.startsWith("\n")
-					? content
-					: content
-					? "\n" + content
-					: "")
-			);
-		}
-		const before = content.slice(0, fm.end);
-		const after = content.slice(fm.end);
-		const sep = after.startsWith("\n\n") ? "\n" : "\n\n";
-		return (
-			before +
-			sep +
-			section +
-			(after.startsWith("\n") ? "" : "\n") +
-			after
-		);
-	}
+	/** Insert annotation within annotation blocks section */
+	private insertInAnnotationBlocks(content: string, section: string): string {
+		// First, try to find the BLOCKS_END marker to insert before it
+		const blocksEndIndex = content.indexOf(OzrpAnnoMarks.BLOCKS_END);
+		if (blocksEndIndex !== -1) {
+			// Split content at the marker position
+			const before = content.slice(0, blocksEndIndex);
+			const after = content.slice(blocksEndIndex);
 
-	/** Return start/end indices of YAML frontmatter block, if the file starts with one */
-	private getFrontmatterRange(
-		content: string
-	): { start: number; end: number } | null {
-		if (!content.startsWith("---\n")) return null;
-		// Find the closing --- at the start of a line
-		const re = /^---\s*$[\s\S]*?^---\s*$\r?\n?/m;
-		const m = re.exec(content);
-		if (!m) return null;
-		return { start: m.index, end: m.index + m[0].length };
+			const beforeTrimmed = before.replace(/(\r?\n)+$/g, "");
+			const afterTrimmed = after.replace(/^(\r?\n)+/g, "");
+
+			const newContent =
+				beforeTrimmed + "\n\n" + section + "\n\n" + afterTrimmed;
+
+			return newContent;
+		}
+		// If no BLOCKS_END marker, append at the end with proper separation
+		const contentTrimmed = content.replace(/(\r?\n)+$/g, "");
+		return contentTrimmed + "\n\n" + section;
 	}
 }
