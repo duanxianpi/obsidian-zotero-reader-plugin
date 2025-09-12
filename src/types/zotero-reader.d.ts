@@ -67,7 +67,7 @@ export type ParentApi = {
 export type ChildApi = {
 	// parent → child
 	initReader: (
-		obsidianSourceFilePath: string,
+		mdSourceFilePath: string,
 		opts: CreateReaderOptions
 	) => Promise<{ ok: true }>;
 	setColorScheme: (colorScheme: ColorScheme) => Promise<{ ok: true }>;

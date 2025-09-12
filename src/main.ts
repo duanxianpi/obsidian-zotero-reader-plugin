@@ -305,7 +305,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 			await activeView.leaf.setViewState({
 				type: READER_VIEW_TYPE,
 				state: {
-					sourceFilePath: file.path,
+					mdSourceFilePath: file.path,
 					sourceViewState: activeView.getState(),
 				},
 				active: true,
@@ -368,7 +368,6 @@ export default class ZoteroReaderPlugin extends Plugin {
 					if (!content.includes("OZRP-ANNO-BEGIN")) {
 						continue;
 					}
-
 					
 					const annotationManager = await AnnotationManager.create(
 						this.app.vault,
@@ -480,7 +479,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 
 		for (const leaf of leaves) {
 			const view = leaf.view as ZoteroReaderView;
-			if (view && view.getState().sourceFilePath === filePath) {
+			if (view && view.getState().mdSourceFilePath === filePath) {
 				return leaf;
 			}
 		}
@@ -506,7 +505,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 		await leaf.setViewState({
 			type: READER_VIEW_TYPE,
 			state: {
-				sourceFilePath: filePath,
+				mdSourceFilePath: filePath,
 				sourceViewState: {
 					file: filePath,
 				},

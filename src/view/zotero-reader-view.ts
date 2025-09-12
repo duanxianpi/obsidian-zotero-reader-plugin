@@ -21,7 +21,7 @@ import ZoteroReaderPlugin from "src/main";
 export const VIEW_TYPE = "zotero-reader-view";
 
 interface ReaderViewState extends Record<string, unknown> {
-	sourceFilePath: string;
+	mdSourceFilePath: string;
 	sourceViewState: Record<string, unknown>;
 	readerOptions: Partial<CreateReaderOptions>;
 }
@@ -58,7 +58,7 @@ export class ZoteroReaderView extends ItemView {
 		this.state = { ...this.state, ...state };
 		await super.setState(state, result);
 
-		this.file = this.app.vault.getFileByPath(this.state.sourceFilePath);
+		this.file = this.app.vault.getFileByPath(this.state.mdSourceFilePath);
 		if (!this.file || !(this.file instanceof TFile)) {
 			return;
 		}
@@ -106,7 +106,7 @@ export class ZoteroReaderView extends ItemView {
 	private async renderReader() {
 		if (
 			!this.state ||
-			!this.state.sourceFilePath ||
+			!this.state.mdSourceFilePath ||
 			!this.state.sourceViewState ||
 			!this.file ||
 			!this.fileFrontmatter
@@ -134,7 +134,7 @@ export class ZoteroReaderView extends ItemView {
 
 				this.bridge = new IframeReaderBridge(
 					container,
-					this.state.sourceFilePath
+					this.state.mdSourceFilePath
 				);
 
 				// Register event listeners
@@ -203,12 +203,7 @@ export class ZoteroReaderView extends ItemView {
 
 				await this.bridge.connect();
 			}
-
-			// Update the source file path in the bridge
-			if (this.bridge && this.file?.path) {
-				this.bridge.setSourceFilePath(this.file.path);
-			}
-
+			
 			const source = this.fileFrontmatter?.["source"] as string;
 
 			let trimmedSource = source.trim();
@@ -272,7 +267,7 @@ export class ZoteroReaderView extends ItemView {
 						this.app.vault.getFileByPath(trimmedSource);
 					if (!localFile || !(localFile instanceof TFile)) {
 						throw new Error(
-							"Local file not found:" + this.state.source
+							"Local file not found:" + trimmedSource
 						);
 					}
 					const arrayBuffer = await this.app.vault.readBinary(
@@ -294,7 +289,7 @@ export class ZoteroReaderView extends ItemView {
 					break;
 				default:
 					throw new Error(
-						"Unknown source type:" + this.state.sourceType
+						"Unknown source type:" + sourceType
 					);
 			}
 		} catch (e) {

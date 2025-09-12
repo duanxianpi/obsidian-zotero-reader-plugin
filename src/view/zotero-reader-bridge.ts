@@ -40,7 +40,7 @@ export class IframeReaderBridge {
 
 	constructor(
 		private container: HTMLElement,
-		private sourceFilePath: string
+		private mdSourceFilePath: string
 	) {}
 
 	/**
@@ -184,7 +184,7 @@ export class IframeReaderBridge {
 
 		// If this is a reconnection and we have reader options, re-initialize the reader
 		if (this._readerOpts) {
-			await this.remote.initReader(this.sourceFilePath, this._readerOpts);
+			await this.remote.initReader(this.mdSourceFilePath, this._readerOpts);
 		}
 
 		// Drain queued calls
@@ -207,7 +207,7 @@ export class IframeReaderBridge {
 	initReader(opts: CreateReaderOptions) {
 		this._readerOpts = opts;
 		return this.enqueueOrRun(async () => {
-			await this.remote!.initReader(this.sourceFilePath, opts);
+			await this.remote!.initReader(this.mdSourceFilePath, opts);
 		});
 	}
 
@@ -221,22 +221,6 @@ export class IframeReaderBridge {
 		return this.enqueueOrRun(async () => {
 			await this.remote!.navigate(navigationInfo);
 		});
-	}
-
-	/**
-	 * Set the source file path for the current view
-	 * @param path The absolute path to the source file
-	 */
-	setSourceFilePath(path: string) {
-		this.sourceFilePath = path;
-	}
-
-	/**
-	 * Get the current source file path
-	 * @returns The absolute path to the source file
-	 */
-	getSourceFilePath(): string {
-		return this.sourceFilePath;
 	}
 
 	async dispose(clearListeners = true) {
