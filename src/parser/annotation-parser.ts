@@ -22,16 +22,16 @@ export const OzrpAnnoMarks = {
 // );
 
 const SECTION_WITH_MARKERS_RE = new RegExp(
-	String.raw`(^[>\t ]*%%\s*OZRP-ANNO-BEGIN\b` + // group 1: begin line (with trailing NL)
-		String.raw`[\t ]*` +
+	String.raw`(%%\s*OZRP-ANNO-BEGIN` + // group 1: begin line (with trailing NL)
+		String.raw`[\t\s]*` +
 		String.raw`(\{[\s\S]*?\})` + // group 2: grab the JSON object
-		String.raw`\s*%%[\t ]*(?:\r?\n))` +
+		String.raw`\s*%%[\t\s]*(?:\r?\n))` +
 		String.raw`([\s\S]*?)` + // group 3: inner body (non-greedy)
-		String.raw`(?=^[>\t ]*%%\s*OZRP-ANNO-END\s*%%[\t ]*$)`, // lookahead up to END line
+		String.raw`(?=%%\s*OZRP-ANNO-END\s*%%)`, // lookahead up to END line
 	"gm"
 );
 
-const SECTION_END_LINE_RE = /^[>\t ]*%%\s*OZRP-ANNO-END\s*%%[\t ]*$/gm;
+const SECTION_END_LINE_RE = /%%\s*OZRP-ANNO-END\s*%%/gm;
 
 // Inside a normalized section (no leading ">"), capture header + chunks
 const HEADER_LINE_RE = /^(?:\s*>\s*)?\[!info\][\s\S]*$/m; // optional, very loose

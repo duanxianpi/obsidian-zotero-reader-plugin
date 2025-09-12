@@ -385,10 +385,18 @@ export class ZoteroReaderView extends ItemView {
 		if (!this.file) return;
 
 		// Wait a bit for the metadata cache to update
-		setTimeout(() => {
-			this.fileFrontmatter = this.app.metadataCache.getFileCache(
-				this.file!
-			)?.frontmatter as Record<string, unknown> | undefined;
+		setTimeout(async () => {
+			const content = await this.app.vault.read(this.file!);
+
+			const info = getFrontMatterInfo(content);
+
+			if (!info || !info.frontmatter) return;
+
+			// turn the YAML string into a JS object
+			this.fileFrontmatter = parseYaml(info.frontmatter) as Record<
+				string,
+				unknown
+			>;
 		}, 100);
 	}
 
