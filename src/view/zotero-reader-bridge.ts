@@ -12,14 +12,9 @@ import {
 	MarkdownEditorProps,
 } from "../editor/markdownEditor";
 import { EditorView, keymap, placeholder, ViewUpdate } from "@codemirror/view";
-import { App } from "obsidian";
+import { Platform } from "obsidian";
 
-type BridgeState =
-	| "idle"
-	| "connecting"
-	| "ready"
-	| "disposing"
-	| "disposed";
+type BridgeState = "idle" | "connecting" | "ready" | "disposing" | "disposed";
 
 export class IframeReaderBridge {
 	private iframe: HTMLIFrameElement | null = null;
@@ -93,7 +88,13 @@ export class IframeReaderBridge {
 		this.iframe = document.createElement("iframe");
 		this.iframe.id = "zotero-reader-iframe";
 		this.iframe.style.cssText = "width:100%;height:100%;border:none;";
-		this.iframe.src = this.src;
+
+		if (Platform.isAndroidApp) {
+			const srcdoc = await fetch((window as any).BLOB_URL_MAP["reader.html"]).then(res => res.text());
+			this.iframe.srcdoc = srcdoc;
+		} else {
+			this.iframe.src = this.src;
+		}
 		this.iframe.sandbox.add("allow-scripts");
 		this.iframe.sandbox.add("allow-same-origin");
 		this.iframe.sandbox.add("allow-forms");
@@ -105,12 +106,13 @@ export class IframeReaderBridge {
 			if (this.state === "ready" && this._readerOpts) {
 				// It was loaded before, but it was loaded again somehow
 				// We need to reconnect but avoid infinite loop
-				console.warn("Iframe reloaded unexpectedly, triggering reconnection");
+				console.warn(
+					"Iframe reloaded unexpectedly, triggering reconnection"
+				);
 				// Use setTimeout to avoid potential stack overflow
 				setTimeout(() => this.reconnect(), 0);
 			}
 		};
-
 
 		// Parent API exposed to child (event channel)
 		const parentApi: ParentApi = {
@@ -184,7 +186,10 @@ export class IframeReaderBridge {
 
 		// If this is a reconnection and we have reader options, re-initialize the reader
 		if (this._readerOpts) {
-			await this.remote.initReader(this.mdSourceFilePath, this._readerOpts);
+			await this.remote.initReader(
+				this.mdSourceFilePath,
+				this._readerOpts
+			);
 		}
 
 		// Drain queued calls
