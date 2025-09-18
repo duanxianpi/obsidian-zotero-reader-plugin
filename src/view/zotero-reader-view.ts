@@ -10,7 +10,6 @@ import {
 } from "obsidian";
 import { IframeReaderBridge } from "./zotero-reader-bridge";
 import {
-	ChildEvents,
 	CreateReaderOptions,
 	ColorScheme,
 	ZoteroAnnotation,
@@ -134,7 +133,8 @@ export class ZoteroReaderView extends ItemView {
 
 				this.bridge = new IframeReaderBridge(
 					container,
-					this.state.mdSourceFilePath
+					this.state.mdSourceFilePath,
+					this.plugin.settings
 				);
 
 				// Register event listeners
@@ -505,7 +505,7 @@ export class ZoteroReaderView extends ItemView {
 	getDisplayText() {
 		if (
 			this.state &&
-			this.state.sourceFilePath &&
+			this.state.mdSourceFilePath &&
 			this.file &&
 			this.fileFrontmatter &&
 			this.fileFrontmatter["source"]

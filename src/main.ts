@@ -29,30 +29,36 @@ import { InitializeBlobUrls } from "./bundle-assets/inline-assets";
 import { OzrpAnnoCommentExtension } from "./editor/ozrp-anno-comment-extension";
 import { CustomReaderTheme } from "./types/zotero-reader";
 
-interface ZoteroReaderPluginSettings {
+export interface ZoteroReaderPluginSettings {
 	readerThemes: CustomReaderTheme[];
 	sidebarPosition: "start" | "end";
 	annotationBlockTemplate: string;
+	copyLinkToSelectionTemplate: string;
+	copyLinkToAnnotationTemplate: string;
+	defaultAnnotationCopyType: "annotation" | "block";
 }
 
 export const DEFAULT_SETTINGS: ZoteroReaderPluginSettings = {
 	readerThemes: [],
 	sidebarPosition: "start",
-	annotationBlockTemplate: `{{ beginMarker }}
-> [!ozrp-{{ type }}-{{ color }}] [{{ displayText }}](obsidian://zotero-reader?file={{ encodedFilePath }}&navigation={{ navLink }})
-> {{ quoteBeginMarker }}
+	defaultAnnotationCopyType: "block",
+	annotationBlockTemplate: `%% OZRP-ANNO-BEGIN {{rawJson}} %%
+> [!ozrp-{{ type }}-{{ color }}] [{{source}}, page {{pageLabel}}]({{link}})
+> %% OZRP-ANNO-QUOTE-BEGIN %%
 > > {{ quote }}
-> {{ quoteEndMarker }}
+> %% OZRP-ANNO-QUOTE-END %%
 > 
 {%- if comment.trim() %}
-> {{ commentBeginMarker }} 
+> %% OZRP-ANNO-COMM-BEGIN %%
 > {{ comment }}
-> {{ commentEndMarker }} ^{{ id }}
+> %% OZRP-ANNO-COMM-END %% ^{{ id }}
 {%- else %}
-> {{ commentBeginMarker }} {{ commentEndMarker }} ^{{ id }}
+> %% OZRP-ANNO-COMM-BEGIN %% %% OZRP-ANNO-COMM-END %% ^{{ id }}
 {%- endif %}
 
-{{ endMarker }}`,
+%% OZRP-ANNO-END %%`,
+	copyLinkToSelectionTemplate: `> {{selectedText}} [page, {{pageLabel}}]({{link}})`,
+	copyLinkToAnnotationTemplate: `> {{annotationText}} [page, {{pageLabel}}]({{link}})`,
 };
 
 const TOGGLE_ICON_CONTAINER_ID = "zotero-reader-toggle-container";
@@ -181,14 +187,14 @@ export default class ZoteroReaderPlugin extends Plugin {
 			name: "Update file's annotations to latest template",
 			checkCallback: (checking: boolean) => {
 				const activeFile = this.app.workspace.getActiveFile();
-				if (activeFile && activeFile.extension === 'md') {
+				if (activeFile && activeFile.extension === "md") {
 					if (!checking) {
 						this.updateFileAnnotationsToLatestTemplate(activeFile);
 					}
 					return true;
 				}
 				return false;
-			}
+			},
 		});
 
 		// Add command to update all annotations in vault to latest template
@@ -197,7 +203,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 			name: "Update ALL annotations in vault to latest template",
 			callback: () => {
 				this.updateAllAnnotationsToLatestTemplate();
-			}
+			},
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
@@ -316,35 +322,45 @@ export default class ZoteroReaderPlugin extends Plugin {
 	/**
 	 * Update all annotations in a file to use the latest template
 	 */
-	private async updateFileAnnotationsToLatestTemplate(file: TFile): Promise<void> {
+	private async updateFileAnnotationsToLatestTemplate(
+		file: TFile
+	): Promise<void> {
 		try {
-			
 			// Create annotation manager instance - it will read the file content internally
 			const annotationManager = await AnnotationManager.create(
 				this.app.vault,
 				file,
 				this.settings.annotationBlockTemplate
 			);
-			
+
 			const annotations = annotationManager.annotationMap;
-			
+
 			if (annotations.size === 0) {
 				new Notice("No annotations found in this file");
 				return;
 			}
-			
+
 			// Update each annotation with its current JSON data to regenerate with new template
-			const updatedCount = await annotationManager.updateAllAnnotationsToLatestTemplate();
+			const updatedCount =
+				await annotationManager.updateAllAnnotationsToLatestTemplate();
 
 			if (updatedCount > 0) {
-				new Notice(`Updated ${updatedCount} annotation${updatedCount > 1 ? 's' : ''} to latest template`);
+				new Notice(
+					`Updated ${updatedCount} annotation${
+						updatedCount > 1 ? "s" : ""
+					} to latest template`
+				);
 			} else {
 				new Notice("No annotations were updated");
 			}
-			
 		} catch (error) {
-			console.error("Error updating annotations to latest template:", error);
-			new Notice("Failed to update annotations. Check console for details.");
+			console.error(
+				"Error updating annotations to latest template:",
+				error
+			);
+			new Notice(
+				"Failed to update annotations. Check console for details."
+			);
 		}
 	}
 
@@ -363,51 +379,61 @@ export default class ZoteroReaderPlugin extends Plugin {
 			for (const file of files) {
 				try {
 					const content = await this.app.vault.read(file);
-					
+
 					// Quick check if file contains annotation markers before creating manager
 					if (!content.includes("OZRP-ANNO-BEGIN")) {
 						continue;
 					}
-					
+
 					const annotationManager = await AnnotationManager.create(
 						this.app.vault,
 						file,
 						this.settings.annotationBlockTemplate
 					);
-					
+
 					const annotations = annotationManager.annotationMap;
-					
+
 					if (annotations.size === 0) {
 						continue;
 					}
 
 					filesWithAnnotations++;
 					let fileUpdatedCount = 0;
-					
-					const updatedCount = await annotationManager.updateAllAnnotationsToLatestTemplate();
-					fileUpdatedCount ++;
+
+					const updatedCount =
+						await annotationManager.updateAllAnnotationsToLatestTemplate();
+					fileUpdatedCount++;
 					totalUpdated += updatedCount;
-					
+
 					if (fileUpdatedCount > 0) {
-						console.log(`Updated ${fileUpdatedCount} annotations in ${file.path}`);
+						console.log(
+							`Updated ${fileUpdatedCount} annotations in ${file.path}`
+						);
 					}
-					
+
 					filesProcessed++;
-					
 				} catch (error) {
 					console.error(`Error processing file ${file.path}:`, error);
 				}
 			}
 
 			if (totalUpdated > 0) {
-				new Notice(`Updated ${totalUpdated} annotations across ${filesWithAnnotations} files`);
+				new Notice(
+					`Updated ${totalUpdated} annotations across ${filesWithAnnotations} files`
+				);
 			} else {
-				new Notice("No annotations found in vault or all annotations were already up to date");
+				new Notice(
+					"No annotations found in vault or all annotations were already up to date"
+				);
 			}
-			
 		} catch (error) {
-			console.error("Error updating all annotations to latest template:", error);
-			new Notice("Failed to update annotations. Check console for details.");
+			console.error(
+				"Error updating all annotations to latest template:",
+				error
+			);
+			new Notice(
+				"Failed to update annotations. Check console for details."
+			);
 		}
 	}
 
@@ -549,6 +575,24 @@ class SampleSettingTab extends PluginSettingTab {
 					})
 			);
 
+		const defaultAnnotationCopyTypeSetting = new Setting(containerEl)
+			.setName("Default Annotation Copy Type")
+			.setDesc(
+				"Set the default copy type for annotations. This will affect drag-and-drop and ctrl/cmd-c copy actions."
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("annotation", "Annotation")
+					.addOption("block", "Block")
+					.setValue(this.plugin.settings.defaultAnnotationCopyType)
+					.onChange(async (value) => {
+						this.plugin.settings.defaultAnnotationCopyType = value as
+							| "annotation"
+							| "block";
+						await this.plugin.saveSettings();
+					})
+			);
+
 		const annotationTemplateSetting = new Setting(containerEl)
 			.setName("Annotation Block Template")
 			.setDesc(
@@ -561,9 +605,13 @@ class SampleSettingTab extends PluginSettingTab {
 						this.plugin.settings.annotationBlockTemplate = value;
 						await this.plugin.saveSettings();
 					});
-				text.inputEl.rows = 20;
 				text.inputEl.wrap = "off";
 				text.inputEl.style.width = "100%";
+				const lineHeight = parseFloat(
+					getComputedStyle(text.inputEl).lineHeight
+				);
+				text.inputEl.style.height =
+					text.inputEl.scrollHeight + lineHeight + "px";
 				text.inputEl.style.fontFamily = "monospace";
 				text.inputEl.style.resize = "vertical";
 			})
@@ -584,5 +632,86 @@ class SampleSettingTab extends PluginSettingTab {
 		annotationTemplateSetting.controlEl.style.flexDirection = "column";
 		annotationTemplateSetting.controlEl.style.width = "100%";
 		annotationTemplateSetting.controlEl.style.alignItems = "flex-end";
+
+		const copyLinkToSelectionTemplateSetting = new Setting(containerEl)
+			.setName("Copy Link to Selection Template")
+			.setDesc(
+				"Customize the template used for the 'Copy Link to Selection' action. You can use Nunjucks templating. See the documentation for available variables."
+			)
+			.addTextArea((text) => {
+				text.setPlaceholder("Enter your custom copy link template...")
+					.setValue(this.plugin.settings.copyLinkToSelectionTemplate)
+					.onChange(async (value) => {
+						this.plugin.settings.copyLinkToSelectionTemplate = value;
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.wrap = "off";
+				text.inputEl.style.width = "100%";
+				const lineHeight = parseFloat(
+					getComputedStyle(text.inputEl).lineHeight
+				);
+				text.inputEl.style.height =
+					text.inputEl.scrollHeight + lineHeight + "px";
+				text.inputEl.style.fontFamily = "monospace";
+				text.inputEl.style.resize = "vertical";
+			})
+			.addButton((button) => {
+				button
+					.setButtonText("Reset to Default")
+					.setTooltip("Reset the copy link template to the default")
+					.onClick(async () => {
+						this.plugin.settings.copyLinkToSelectionTemplate =
+							DEFAULT_SETTINGS.copyLinkToSelectionTemplate;
+						await this.plugin.saveSettings();
+						this.display(); // Refresh the settings display
+					});
+			});
+
+		copyLinkToSelectionTemplateSetting.settingEl.style.flexDirection = "column";
+		copyLinkToSelectionTemplateSetting.settingEl.style.alignItems = "flex-start";
+		copyLinkToSelectionTemplateSetting.controlEl.style.flexDirection = "column";
+		copyLinkToSelectionTemplateSetting.controlEl.style.width = "100%";
+		copyLinkToSelectionTemplateSetting.controlEl.style.alignItems = "flex-end";
+
+		const copyLinkToAnnotationTemplateSetting = new Setting(containerEl)
+			.setName("Copy Link to Annotation Template")
+			.setDesc(
+				"Customize the template used for the 'Copy Link to Annotation' action. You can use Nunjucks templating. See the documentation for available variables."
+			)
+			.addTextArea((text) => {
+				text.setPlaceholder("Enter your custom copy link template...")
+					.setValue(this.plugin.settings.copyLinkToAnnotationTemplate)
+					.onChange(async (value) => {
+						this.plugin.settings.copyLinkToAnnotationTemplate = value;
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.wrap = "off";
+				text.inputEl.style.width = "100%";
+				const lineHeight = parseFloat(
+					getComputedStyle(text.inputEl).lineHeight
+				);
+				text.inputEl.style.height =
+					text.inputEl.scrollHeight + lineHeight + "px";
+				text.inputEl.style.fontFamily = "monospace";
+				text.inputEl.style.resize = "vertical";
+			})
+			.addButton((button) => {
+				button
+					.setButtonText("Reset to Default")
+					.setTooltip("Reset the copy link template to the default")
+					.onClick(async () => {
+						this.plugin.settings.copyLinkToAnnotationTemplate =
+							DEFAULT_SETTINGS.copyLinkToAnnotationTemplate;
+						await this.plugin.saveSettings();
+						this.display(); // Refresh the settings display
+					});
+			});
+
+		copyLinkToAnnotationTemplateSetting.settingEl.style.flexDirection = "column";
+		copyLinkToAnnotationTemplateSetting.settingEl.style.alignItems = "flex-start";
+		copyLinkToAnnotationTemplateSetting.controlEl.style.flexDirection = "column";
+		copyLinkToAnnotationTemplateSetting.controlEl.style.width = "100%";
+		copyLinkToAnnotationTemplateSetting.controlEl.style.alignItems = "flex-end";
+
 	}
 }

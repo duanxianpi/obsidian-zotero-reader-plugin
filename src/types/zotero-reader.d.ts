@@ -1,5 +1,6 @@
 import { EmbeddableMarkdownEditor, MarkdownEditorProps } from "src/editor/markdown-editor";
 import { ViewUpdate } from "@codemirror/view";
+import { ZoteroReaderPluginSettings } from "src/main";
 
 export type ColorScheme = "light" | "dark";
 
@@ -64,11 +65,12 @@ export type ParentAPI = {
 	getBlobUrlMap: () => Record<string, string>;
 	handleEvent: (evt: ChildEvents) => void;
 	isAndroidApp: () => boolean;
-	getMarkdownSourceFilePath: () => string;
+	getMdSourceFilePath: () => string;
 	getOrigin: () => string;
 	getMathJaxConfig: () => any;
 	getStyleSheets: () => StyleSheetList;
 	getColorScheme: () => ColorScheme;
+	getPluginSettings: () => ZoteroReaderPluginSettings;
 	createAnnotationEditor: (
 		container: HTMLElement,
 		options: Partial<MarkdownEditorProps>

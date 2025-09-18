@@ -6,13 +6,7 @@
  * for working with annotation blocks in markdown files.
  */
 
-import {
-	TFile,
-	Vault,
-	MetadataCache,
-	getFrontMatterInfo,
-	parseYaml,
-} from "obsidian";
+import { TFile, Vault, getFrontMatterInfo, parseYaml } from "obsidian";
 import { AnnotationParser, OzrpAnnoMarks } from "../parser/annotation-parser";
 import { ParsedAnnotation, ZoteroAnnotation } from "../types/zotero-reader";
 import * as nunjucks from "nunjucks";
@@ -273,7 +267,7 @@ export class AnnotationManager {
 		// Template context
 		const templateContext = {
 			beginMarker: OzrpAnnoMarks.BEGIN.replace(
-				"{json}",
+				"{{rawJson}}",
 				JSON.stringify({ ...json, text: "", comment: "" })
 			),
 			endMarker: OzrpAnnoMarks.END,
@@ -281,9 +275,15 @@ export class AnnotationManager {
 			quoteEndMarker: OzrpAnnoMarks.Q_END,
 			commentBeginMarker: OzrpAnnoMarks.C_BEGIN,
 			commentEndMarker: OzrpAnnoMarks.C_END,
+			rawJson: JSON.stringify({ ...json, text: "", comment: "" }),
 			type: json.type,
 			color,
 			displayText,
+			source: sourceText,
+			pageLabel,
+			link: `obsidian://zotero-reader?file=${encodeURIComponent(
+				this.file.path
+			)}&navigation=${navLink}`,
 			encodedFilePath: encodeURIComponent(this.file.path),
 			navLink,
 			quote: json.text || "",

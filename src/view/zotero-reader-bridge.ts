@@ -12,10 +12,11 @@ import {
 	MarkdownEditorProps,
 } from "../editor/markdown-editor";
 
-import { EditorView, ViewUpdate } from "@codemirror/view";
+import { EditorView } from "@codemirror/view";
 import { Platform } from "obsidian";
 import { v4 as uuidv4 } from "uuid";
 import { connect, WindowMessenger } from "penpal";
+import { ZoteroReaderPluginSettings } from "../main";
 
 type BridgeState = "idle" | "connecting" | "ready" | "disposing" | "disposed";
 
@@ -45,7 +46,8 @@ export class IframeReaderBridge {
 
 	constructor(
 		private container: HTMLElement,
-		private mdSourceFilePath: string
+		private mdSourceFilePath: string,
+		private pluginSettings: ZoteroReaderPluginSettings
 	) {}
 
 	/**
@@ -90,7 +92,7 @@ export class IframeReaderBridge {
 				if (ls) ls.forEach((l) => l(evt));
 			},
 
-			getMarkdownSourceFilePath: () => this.mdSourceFilePath,
+			getMdSourceFilePath: () => this.mdSourceFilePath,
 
 			getOrigin: () => {
 				return window.location.origin;
@@ -107,6 +109,10 @@ export class IframeReaderBridge {
 
 			getStyleSheets: () => {
 				return document.styleSheets;
+			},
+
+			getPluginSettings: () => {
+				return this.pluginSettings;
 			},
 
 			createAnnotationEditor: (

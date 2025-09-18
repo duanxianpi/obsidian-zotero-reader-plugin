@@ -2,7 +2,7 @@ import { ParsedAnnotation, ZoteroAnnotation } from "../types/zotero-reader";
 
 /** Internal constants for the block markers */
 export const OzrpAnnoMarks = {
-	BEGIN: "%% OZRP-ANNO-BEGIN {json} %%",
+	BEGIN: "%% OZRP-ANNO-BEGIN {{rawJson}} %%",
 	END: "%% OZRP-ANNO-END %%",
 	Q_BEGIN: "%% OZRP-ANNO-QUOTE-BEGIN %%",
 	Q_END: "%% OZRP-ANNO-QUOTE-END %%",
