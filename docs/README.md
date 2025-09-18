@@ -12,6 +12,7 @@ Welcome to the comprehensive documentation for the Obsidian Zotero Reader Plugin
 - **[Settings](SETTINGS.md)** - Settings for the plugin
 - **[Commands](COMMANDS.md)** - Settings for the plugin
 - **[Template System](TEMPLATE_VARIABLES.md)** - Customize annotation and link templates
+- **[Zotero Integration](ZOTLIT_WORKFLOW.md)** - Workflow to work with Zotero
 
 ---
 

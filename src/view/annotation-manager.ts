@@ -253,6 +253,13 @@ export class AnnotationManager {
 
 		const trimmedSource = this.source.trim();
 		sourceText = trimmedSource.replace(/^\[\[|\]\]$/g, "");
+		const m = /\[[^\]]*]\(\s*<?([^>\s)]+(?:\([^)]*\)[^>\s)]*)*)>?(?:\s+(?:"[^"]*"|'[^']*'|\([^()]*\)))?\s*\)/g.exec(
+			sourceText
+		);
+		if (m && m[1]) {
+			sourceText = m[1];
+		}
+		sourceText = decodeURIComponent(sourceText);
 		sourceText = sourceText.split("/").pop() || sourceText;
 
 		// Prepare template data

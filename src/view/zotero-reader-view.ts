@@ -213,7 +213,15 @@ export class ZoteroReaderView extends ItemView {
 			} else {
 				sourceType = "local";
 				trimmedSource = trimmedSource.replace(/^\[\[|\]\]$/g, "");
+				const m = /\[[^\]]*]\(\s*<?([^>\s)]+(?:\([^)]*\)[^>\s)]*)*)>?(?:\s+(?:"[^"]*"|'[^']*'|\([^()]*\)))?\s*\)/g.exec(
+					trimmedSource
+				);
+				if (m && m[1]) {
+					trimmedSource = m[1];
+				}
+				trimmedSource = decodeURIComponent(trimmedSource);
 			}
+			console.log("Resolved source:", trimmedSource, "Type:", sourceType);
 
 			const extension = trimmedSource.split(".").pop();
 			if (!extension) throw new Error("Invalid file extension");
@@ -517,7 +525,15 @@ export class ZoteroReaderView extends ItemView {
 		) {
 			const source = (this.fileFrontmatter["source"] as string).trim();
 			if (typeof source === "string") {
-				const trimmedSource = source.trim().replace(/^\[\[|\]\]$/g, "");
+				let trimmedSource = source.trim().replace(/^\[\[|\]\]$/g, "");
+				const m = /\[[^\]]*]\(\s*<?([^>\s)]+(?:\([^)]*\)[^>\s)]*)*)>?(?:\s+(?:"[^"]*"|'[^']*'|\([^()]*\)))?\s*\)/g.exec(
+					trimmedSource
+				);
+				if (m && m[1]) {
+					trimmedSource = m[1];
+				}
+				trimmedSource = decodeURIComponent(trimmedSource);
+
 				const sourceText =
 					trimmedSource.split("/").pop() || trimmedSource;
 
