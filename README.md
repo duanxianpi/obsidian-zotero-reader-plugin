@@ -22,29 +22,13 @@ Read and annotate PDFs/EPUB/HTML inside Obsidian with awesome Zotero Reader! Thi
 
 > **Note:** This plugin is **not ready for production** yet. Install using the [Obsidian BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin.
 
-1. In Obsidian, open **Settings → Community plugins** and install **BRAT**.
-2. In BRAT, choose **Add beta plugin** and enter the repo: `duanxianpi/obsidian-zotero-reader-plugin`.
-3. Enable **Obsidian Zotero Reader** in your Community plugins list.
+**[Installation Guide](docs/INSTALLATION.md)**
 
 ---
 
 ## Usage
-1. Create a new md file
-2. Add the following YAML frontmatter to the Markdown file. The `source` can point to a local `pdf`, `epub`, or `html` or network file.
 
-```yaml
----
-zotero-reader: true
-source: path/to/file.pdf # or .epub / .html
----
-```
-source also support link like `[[path/to/file]]`
-
-or
-
-**right click on any `pdf`, `epub`, or `html` file, then choose `Create Zotero Reader Note`**
-
-Then open the note and **click the icon in the top-right** to launch the reader.
+Start with the [Quick Start Guide](docs/QUICK_START.md)!
 
 ### Annotation
 ![anno](docs/anno.gif)
@@ -73,8 +57,8 @@ Then open the note and **click the icon in the top-right** to launch the reader.
 **[Complete Documentation](docs/README.md)** - Comprehensive guides and references
 
 ### Quick Links
-- **[Quick Start Guide](docs/QUICK_START.md)** - Get started in 5 minutes
 - **[Installation Guide](docs/INSTALLATION.md)** - Step-by-step installation
+- **[Quick Start Guide](docs/QUICK_START.md)** - Get started in 5 minutes
 - **[Template Variables](docs/TEMPLATE_VARIABLES.md)** - Customize annotation templates
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 
@@ -90,8 +74,6 @@ Then open the note and **click the icon in the top-right** to launch the reader.
 | [Keyboard Shortcuts](docs/SHORTCUTS.md) | Complete shortcut reference |
 | [Development](docs/DEVELOPMENT.md) | Development setup and API |
  -->
-
-> **New to the plugin?** Start with the [Quick Start Guide](docs/QUICK_START.md)!
 
 ## Development
 
