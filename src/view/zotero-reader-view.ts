@@ -269,7 +269,7 @@ export class ZoteroReaderView extends ItemView {
 					} else if (Platform.isDesktopApp) {
 						// Try resolving as absolute path for local files in desktop app
 						const fs = (window as any).require("fs").promises;
-						arrayBuffer = await fs.readFile(trimmedSource);
+						arrayBuffer = await fs.readFile(new URL(trimmedSource));
 					} else {
 						throw new Error(
 							"Local file not found:" + trimmedSource
@@ -277,14 +277,14 @@ export class ZoteroReaderView extends ItemView {
 					}
 
 					await this.bridge.initReader({
-						data: { buf: new Uint8Array(arrayBuffer) },
+						data: { buf: new Uint8Array(arrayBuffer), url: null },
 						type: readerType,
 						...opts,
 					});
 					break;
 				case "url":
 					await this.bridge.initReader({
-						data: { url: trimmedSource },
+						data: { url: trimmedSource, buf: null },
 						type: readerType,
 						...opts,
 					});

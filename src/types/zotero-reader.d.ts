@@ -5,7 +5,7 @@ import { ZoteroReaderPluginSettings } from "src/main";
 export type ColorScheme = "light" | "dark";
 
 export interface CreateReaderOptions {
-	data: { buf: Uint8Array } | { url: string };
+	data: { buf: Uint8Array, url: null} | { buf:null, url: string };
 	type: string;
 	sidebarPosition: "start" | "end";
 	platform?: string;
