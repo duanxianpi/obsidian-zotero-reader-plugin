@@ -53,7 +53,7 @@ source: Documents/Research Paper.pdf
 ### Adding Comments
 
 1. **Highlight text** (as above)
-2. **Click the comment icon** in the annotation
+2. **Select color** from popup
 3. **Type your note** in the comment field
 4. **Press Enter** or click outside to save
 
