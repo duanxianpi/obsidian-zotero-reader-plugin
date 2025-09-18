@@ -18,6 +18,7 @@ import {
 	MarkdownRenderer,
 	Component,
 	ObsidianProtocolData,
+	Menu,
 } from "obsidian";
 
 import {
@@ -205,6 +206,25 @@ export default class ZoteroReaderPlugin extends Plugin {
 				this.updateAllAnnotationsToLatestTemplate();
 			},
 		});
+
+		// Register context menu for PDF, EPUB, and HTML files
+		this.registerEvent(
+			this.app.workspace.on("file-menu", (menu, file) => {
+				if (file instanceof TFile) {
+					const extension = file.extension.toLowerCase();
+					if (extension === 'pdf' || extension === 'epub' || extension === 'html') {
+						menu.addItem((item) => {
+							item
+								.setTitle("Create Zotero Reader Note")
+								.setIcon("zotero-icon")
+								.onClick(async () => {
+									await this.createZoteroReaderNote(file);
+								});
+						});
+					}
+				}
+			})
+		);
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
@@ -447,6 +467,46 @@ export default class ZoteroReaderPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	/**
+	 * Create a new note with Zotero Reader frontmatter for the given file
+	 */
+	private async createZoteroReaderNote(file: TFile): Promise<void> {
+		try {
+			// Generate note name based on the source file name
+			const baseName = file.basename;
+			const noteName = `${baseName}.md`;
+			
+			// Check if a note with this name already exists
+			let finalNoteName = noteName;
+			let counter = 1;
+			while (this.app.vault.getFileByPath(finalNoteName)) {
+				finalNoteName = `${baseName} (${counter}).md`;
+				counter++;
+			}
+
+			// Create the content with YAML frontmatter
+			const content = `---
+zotero-reader: true
+source: ${file.path}
+---
+%% OZRP-ANNO-BLOCKS-BEGIN %%
+%% OZRP-ANNO-BLOCKS-END %%
+`;
+
+			// Create the new note
+			const newFile = await this.app.vault.create(finalNoteName, content);
+			
+			// Open the new note in the active workspace
+			const leaf = this.app.workspace.getLeaf();
+			await leaf.openFile(newFile);
+			
+			new Notice(`Created Zotero Reader note: ${finalNoteName}`);
+		} catch (error) {
+			console.error("Error creating Zotero Reader note:", error);
+			new Notice("Failed to create Zotero Reader note. Check console for details.");
+		}
 	}
 
 	/**

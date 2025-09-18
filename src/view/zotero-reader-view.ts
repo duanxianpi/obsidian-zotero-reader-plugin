@@ -7,6 +7,7 @@ import {
 	ButtonComponent,
 	getFrontMatterInfo,
 	parseYaml,
+	Platform,
 } from "obsidian";
 import { IframeReaderBridge } from "./zotero-reader-bridge";
 import {
@@ -198,7 +199,7 @@ export class ZoteroReaderView extends ItemView {
 
 				await this.bridge.connect();
 			}
-			
+
 			const source = this.fileFrontmatter?.["source"] as string;
 
 			let trimmedSource = source.trim();
@@ -260,14 +261,20 @@ export class ZoteroReaderView extends ItemView {
 				case "local":
 					const localFile =
 						this.app.vault.getFileByPath(trimmedSource);
-					if (!localFile || !(localFile instanceof TFile)) {
+					let arrayBuffer: ArrayBuffer;
+					if (localFile && localFile instanceof TFile) {
+						arrayBuffer = await this.app.vault.readBinary(
+							localFile
+						);
+					} else if (Platform.isDesktopApp) {
+						// Try resolving as absolute path for local files in desktop app
+						const fs = (window as any).require("fs").promises;
+						arrayBuffer = await fs.readFile(trimmedSource);
+					} else {
 						throw new Error(
 							"Local file not found:" + trimmedSource
 						);
 					}
-					const arrayBuffer = await this.app.vault.readBinary(
-						localFile
-					);
 
 					await this.bridge.initReader({
 						data: { buf: new Uint8Array(arrayBuffer) },
@@ -283,9 +290,7 @@ export class ZoteroReaderView extends ItemView {
 					});
 					break;
 				default:
-					throw new Error(
-						"Unknown source type:" + sourceType
-					);
+					throw new Error("Unknown source type:" + sourceType);
 			}
 		} catch (e) {
 			console.error("Error loading Zotero Reader view:", e);
