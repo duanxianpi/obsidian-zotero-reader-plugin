@@ -2,7 +2,7 @@
 
 Welcome to the comprehensive documentation for the Obsidian Zotero Reader Plugin! This documentation will help you get the most out of the plugin's features.
 
-## 📚 Documentation Index
+## Documentation Index
 
 ### Getting Started
 - **[Installation Guide](INSTALLATION.md)** - Step-by-step installation instructions
