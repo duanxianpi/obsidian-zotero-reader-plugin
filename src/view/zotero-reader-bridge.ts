@@ -109,15 +109,10 @@ export class IframeReaderBridge {
 				return document.styleSheets;
 			},
 
-			createAnnotationEditor: async (
-				containerId: string,
+			createAnnotationEditor: (
+				container: HTMLElement,
 				options: Partial<MarkdownEditorProps>
 			) => {
-				const container =
-					this.iframe!.contentDocument!.getElementById(containerId);
-				if (!container) {
-					throw new Error(`Container not found: ${containerId}`);
-				}
 				const editor = createEmbeddableMarkdownEditor(
 					(window as any).app,
 					container as HTMLElement,
@@ -133,7 +128,7 @@ export class IframeReaderBridge {
 					}
 				);
 				this.editorList.push(editor);
-				return true;
+				return editor;
 			},
 		};
 	}

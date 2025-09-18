@@ -1,4 +1,4 @@
-import { MarkdownEditorProps } from "src/editor/markdown-editor";
+import { EmbeddableMarkdownEditor, MarkdownEditorProps } from "src/editor/markdown-editor";
 import { ViewUpdate } from "@codemirror/view";
 
 export type ColorScheme = "light" | "dark";
@@ -70,18 +70,15 @@ export type ParentAPI = {
 	getStyleSheets: () => StyleSheetList;
 	getColorScheme: () => ColorScheme;
 	createAnnotationEditor: (
-		containerSelector: string,
+		container: HTMLElement,
 		options: Partial<MarkdownEditorProps>
-	) => Promise<boolean>;
+	) => EmbeddableMarkdownEditor;
 };
 
 export type ChildAPI = {
 	// parent → child
 	initReader: (opts: CreateReaderOptions) => Promise<boolean>;
 	setColorScheme: (colorScheme: ColorScheme) => Promise<boolean>;
-	updateAnnotation: (
-		annotation: Partial<ZoteroAnnotation>
-	) => Promise<boolean>;
 	navigate: (navigationInfo: any) => Promise<boolean>;
 	destroy: () => Promise<boolean>;
 };
