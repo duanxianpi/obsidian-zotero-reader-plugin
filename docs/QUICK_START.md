@@ -47,6 +47,7 @@ source: Documents/Research Paper.pdf
 - Web URLs: `source: https://example.com/document.pdf`
 
 **Annotation Location:**
+
 If you need to specify the location of insert annotations, you could also add
 ```
 %% OZRP-ANNO-BLOCKS-BEGIN %%
