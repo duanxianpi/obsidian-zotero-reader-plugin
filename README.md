@@ -60,7 +60,7 @@ Start with the [Quick Start Guide](docs/QUICK_START.md)!
 - **[Installation Guide](docs/INSTALLATION.md)** - Step-by-step installation
 - **[Quick Start Guide](docs/QUICK_START.md)** - Get started in 5 minutes
 - **[Template Variables](docs/TEMPLATE_VARIABLES.md)** - Customize annotation templates
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Zotero Workflow](docs/ZOTLIT_WORKFLOW.md)** - Workflow 
 
 <!-- ### All Guides
 | Topic | Description |
