@@ -64,6 +64,31 @@ Then open the note and **click the icon in the top-right** to launch the reader.
 
 ---
 
+## Documentation
+
+**[Complete Documentation](docs/README.md)** - Comprehensive guides and references
+
+### Quick Links
+- **[Quick Start Guide](docs/QUICK_START.md)** - Get started in 5 minutes
+- **[Installation Guide](docs/INSTALLATION.md)** - Step-by-step installation
+- **[Template Variables](docs/TEMPLATE_VARIABLES.md)** - Customize annotation templates
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+
+<!-- ### All Guides
+| Topic | Description |
+|-------|-------------|
+| [Installation](docs/INSTALLATION.md) | Complete installation instructions |
+| [Quick Start](docs/QUICK_START.md) | 5-minute setup guide |
+| [Basic Usage](docs/BASIC_USAGE.md) | Learn the fundamentals |
+| [Annotations](docs/ANNOTATIONS.md) | Creating and managing annotations |
+| [Template System](docs/TEMPLATE_VARIABLES.md) | Customize templates with variables |
+| [Settings Reference](docs/SETTINGS.md) | All plugin settings explained |
+| [Keyboard Shortcuts](docs/SHORTCUTS.md) | Complete shortcut reference |
+| [Development](docs/DEVELOPMENT.md) | Development setup and API |
+ -->
+
+> **New to the plugin?** Start with the [Quick Start Guide](docs/QUICK_START.md)!
+
 ## Development
 
 > Make sure you have recent **Node.js** and **npm** installed.
