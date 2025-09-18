@@ -311,9 +311,6 @@ export class EmbeddableMarkdownEditor {
 			syncScroll: () => {},
 		});
 
-		//@ts-ignore
-		window.parent.testEditor = this.editor;
-
 		// Register the uninstaller for cleanup
 		this.register(uninstaller);
 

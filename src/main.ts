@@ -25,8 +25,8 @@ import {
 	VIEW_TYPE as READER_VIEW_TYPE,
 } from "./view/zotero-reader-view";
 import { AnnotationManager } from "./view/annotation-manager";
-import { initializeBlobUrls } from "./bundle-assets/inline-assets";
-import { ozrpAnnoCommentExtension } from "./editor/ozrpAnnoCommentExtension";
+import { InitializeBlobUrls } from "./bundle-assets/inline-assets";
+import { OzrpAnnoCommentExtension } from "./editor/ozrp-anno-comment-extension";
 import { CustomReaderTheme } from "./types/zotero-reader";
 
 interface ZoteroReaderPluginSettings {
@@ -85,7 +85,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 		await this.loadSettings();
 
 		// Initialize the inline blob URLs need by the reader
-		(window as any).BLOB_URL_MAP = initializeBlobUrls();
+		(window as any).BLOB_URL_MAP = InitializeBlobUrls();
 
 		// Ensure MathJax is loaded
 		MarkdownRenderer.render(
@@ -97,7 +97,7 @@ export default class ZoteroReaderPlugin extends Plugin {
 		);
 
 		// Register the annotation comment extension
-		this.registerEditorExtension(ozrpAnnoCommentExtension());
+		this.registerEditorExtension(OzrpAnnoCommentExtension());
 
 		// Add custom icons
 		addIcon(

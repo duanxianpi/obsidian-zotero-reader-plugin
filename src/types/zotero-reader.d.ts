@@ -1,4 +1,4 @@
-import { MarkdownEditorProps } from "src/editor/markdownEditor";
+import { MarkdownEditorProps } from "src/editor/markdown-editor";
 import { ViewUpdate } from "@codemirror/view";
 
 export type ColorScheme = "light" | "dark";
@@ -6,19 +6,24 @@ export type ColorScheme = "light" | "dark";
 export interface CreateReaderOptions {
 	data: { buf: Uint8Array } | { url: string };
 	type: string;
-	sidebarOpen?: boolean;
-	sidebarWidth?: number;
-	colorScheme: ColorScheme;
-	annotations: ZoteroAnnotation[];
-	primaryViewState?: Record<string, unknown>;
-	secondaryViewState?: Record<string, unknown>;
+	sidebarPosition: "start" | "end";
+	platform?: string;
+
+	password?: string;
+	preview?: boolean;
+	colorScheme?: ColorScheme;
 	customThemes?: CustomReaderTheme[];
 	lightTheme?: string;
 	darkTheme?: string;
+
+	annotations?: ZoteroAnnotation[];
+	sidebarOpen?: boolean;
+	sidebarWidth?: number;
+	primaryViewState?: Record<string, unknown>;
+	secondaryViewState?: Record<string, unknown>;
 }
 
 export type ChildEvents =
-	| { type: "ready" }
 	| { type: "error"; code: string; message: string }
 	| { type: "addToNote" }
 	| { type: "annotationsSaved"; annotations: ZoteroAnnotation[] }
@@ -54,28 +59,31 @@ export type ChildEvents =
 	| { type: "setLightTheme"; theme: unknown }
 	| { type: "setDarkTheme"; theme: unknown };
 
-export type ParentApi = {
+export type ParentAPI = {
 	// child → parent
+	getBlobUrlMap: () => Record<string, string>;
 	handleEvent: (evt: ChildEvents) => void;
+	isAndroidApp: () => boolean;
+	getMarkdownSourceFilePath: () => string;
+	getOrigin: () => string;
+	getMathJaxConfig: () => any;
+	getStyleSheets: () => StyleSheetList;
+	getColorScheme: () => ColorScheme;
 	createAnnotationEditor: (
 		containerSelector: string,
-		annotationId: string,
 		options: Partial<MarkdownEditorProps>
-	) => Promise<{ ok: true }>;
+	) => Promise<boolean>;
 };
 
-export type ChildApi = {
+export type ChildAPI = {
 	// parent → child
-	initReader: (
-		mdSourceFilePath: string,
-		opts: CreateReaderOptions
-	) => Promise<{ ok: true }>;
-	setColorScheme: (colorScheme: ColorScheme) => Promise<{ ok: true }>;
+	initReader: (opts: CreateReaderOptions) => Promise<boolean>;
+	setColorScheme: (colorScheme: ColorScheme) => Promise<boolean>;
 	updateAnnotation: (
 		annotation: Partial<ZoteroAnnotation>
-	) => Promise<{ ok: true }>;
-	navigate: (navigationInfo: any) => Promise<{ ok: true }>;
-	destroy: () => Promise<{ ok: true }>;
+	) => Promise<boolean>;
+	navigate: (navigationInfo: any) => Promise<boolean>;
+	destroy: () => Promise<boolean>;
 };
 
 export interface ZoteroPosition {

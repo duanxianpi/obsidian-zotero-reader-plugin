@@ -209,8 +209,5 @@ export function patchPDFJSViewerHTML(
 		doc.documentElement.outerHTML;
 
 	// 8. Make blob URL
-	const blob = new Blob([serialized], { type: "text/html" });
-	const url = URL.createObjectURL(blob);
-	console.info(`Patched viewer.html with blob URL: ${url}`);
-	return url;
+	return serialized;
 }

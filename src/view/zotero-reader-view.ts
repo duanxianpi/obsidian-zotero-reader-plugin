@@ -142,10 +142,6 @@ export class ZoteroReaderView extends ItemView {
 					console.error(`${evt.code}: ${evt.message}`);
 				});
 
-				this.bridge.onEventType("ready", (evt) => {
-					console.log("Reader is ready");
-				});
-
 				this.bridge.onEventType("sidebarToggled", (evt) => {
 					this.handleSidebarToggled(evt.open);
 				});
@@ -156,7 +152,6 @@ export class ZoteroReaderView extends ItemView {
 
 				this.bridge.onEventType("openLink", (evt) => {
 					console.log("Opening link:", evt.url);
-					// Handle link opening logic here
 				});
 
 				this.bridge.onEventType("annotationsSaved", (evt) => {

@@ -8,7 +8,7 @@ import {
 import { RangeSetBuilder, Extension, RangeSet } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 
-export function ozrpAnnoCommentExtension(): Extension {
+export function OzrpAnnoCommentExtension(): Extension {
 	const annoPrefix = /.*OZRP-ANNO.*/i;
 	const annoJsonPrefix = /.*OZRP-ANNO-BEGIN.*/i;
 	const commNodeStartName = /.*comment-start_formatting.*/i;

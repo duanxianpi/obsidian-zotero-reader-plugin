@@ -39,7 +39,7 @@ const ungzipBase64 = (base64: string) => {
 	return decompressedBuffer;
 };
 
-export function initializeBlobUrls(): Record<string, string> {
+export function InitializeBlobUrls(): Record<string, string> {
 	const BLOB_URL_MAP: Record<string, string> = {};
 	const BLOB_BINARY_MAP: Record<string, { type: string; data: Uint8Array }> =
 		{};
@@ -64,7 +64,14 @@ export function initializeBlobUrls(): Record<string, string> {
 	});
 
 	// Patch the viewer.html
-	BLOB_URL_MAP["pdf/web/viewer.html"] = patchPDFJSViewerHTML(BLOB_BINARY_MAP, BLOB_URL_MAP);
-
+	const patchedViewerHTML = patchPDFJSViewerHTML(
+		BLOB_BINARY_MAP,
+		BLOB_URL_MAP
+	);
+	const blob = new Blob([patchedViewerHTML], { type: "text/html" });
+	const url = URL.createObjectURL(blob);
+	BLOB_URL_MAP["pdf/web/viewer.html"] = url;
+	BLOB_URL_MAP["pdf/web/viewer.html.srcdoc"] = patchedViewerHTML;
+	
 	return BLOB_URL_MAP;
 }
