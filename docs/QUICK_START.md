@@ -4,12 +4,23 @@ Get up and running with the Obsidian Zotero Reader Plugin in just a few minutes!
 
 ## 5-Minute Setup
 
-### Step 1: Create Your First Document
+### Create by Context Meau
+#### Step 1: Context Menu
+Right click on any `pdf`, `epub`, or `html` file inside obsidian. Choose `Create Zotero Reader Note`
+
+#### Step 2: Open the Reader
+
+1. Look for the Zotero icon in the file header
+2. Click the icon to launch the reader
+3. Your document should open in the reader interface!
+
+### Manually Create the Note
+#### Step 1: Create Your First Document
 
 1. Create a new Markdown file in your vault
 2. Name it something like `My Document.md`
 
-### Step 2: Add Frontmatter
+#### Step 2: Add Frontmatter
 
 Add this YAML frontmatter to the top of your file:
 
@@ -35,9 +46,17 @@ source: Documents/Research Paper.pdf
 - Obsidian links: `source: "[[My Document]]"`
 - Web URLs: `source: https://example.com/document.pdf`
 
-### Step 3: Open the Reader
+**Annotation Location:**
+If you need to specify the location of insert annotations, you could also add
+```
+%% OZRP-ANNO-BLOCKS-BEGIN %%
+%% OZRP-ANNO-BLOCKS-END %%
+```
 
-1. Look for the Zotero icon (📖) in the file header
+
+#### Step 3: Open the Reader
+
+1. Look for the Zotero icon in the file header
 2. Click the icon to launch the reader
 3. Your document should open in the reader interface!
 
