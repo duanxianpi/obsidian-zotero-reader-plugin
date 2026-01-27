@@ -12,6 +12,9 @@ Read and annotate PDFs/EPUB/HTML inside Obsidian with awesome Zotero Reader! Thi
 
 ---
 
+> [!IMPORTANT]
+> Use this plugin with caution! Due to its underlying design, this plugin is fragile. Any potential modifications on markdown will prevent it from correctly parsing Markdown, thereby failing to extract annotations. Therefore, I am developing a significantly improved version, which will be showcased on Reddit soon. The new version will focus on integration with Zotero, featuring bidirectional data synchronization with Zotero, support for all annotation types, and a built-in Zotero Reader.
+
 ## Demo
 
 ![Demo](docs/demo.gif)
