@@ -12,6 +12,9 @@ Read and annotate PDFs/EPUB/HTML inside Obsidian with awesome Zotero Reader! Thi
 
 ---
 
+> [!TIP]
+> Checkout [ZotFlow](https://github.com/duanxianpi/zotflow)!
+
 > [!IMPORTANT]
 > Use this plugin with caution! Due to its underlying design, this plugin is fragile. Any unexpected modification on note will prevent it from correctly parsing markdown, thereby failing to extract annotations. Therefore, I am developing a significantly improved version, which will be showcased on Obsidian Reddit soon. The new version will focus on integration with Zotero, featuring bidirectional data synchronization with Zotero, support for all annotation types, and a built-in Zotero Reader.
 >
